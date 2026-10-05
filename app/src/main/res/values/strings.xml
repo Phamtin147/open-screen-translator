@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Open Screen Translator</string>
+    <string name="service_notification_title">Open Screen Translator đang chạy</string>
+    <string name="service_notification_desc">Chạm vào bong bóng trên màn hình để dịch tức thì.</string>
+    <string name="stop_service">Dừng dịch</string>
+    <string name="start_service">Khởi động bong bóng dịch</string>
+    <string name="source_language">Ngôn ngữ nguồn</string>
+    <string name="target_language">Ngôn ngữ đích</string>
+    <string name="overlay_opacity">Độ mờ của bong bóng</string>
+    <string name="grant_permission">Cấp quyền hiển thị trên ứng dụng khác</string>
+</resources>
