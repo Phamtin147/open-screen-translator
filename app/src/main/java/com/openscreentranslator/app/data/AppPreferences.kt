@@ -26,7 +26,12 @@ class AppPreferences(context: Context) {
         get() = prefs.getInt("text_size", 14)
         set(value) = prefs.edit().putInt("text_size", value).apply()
 
+    // 0 = Manual dismiss (tap bubble to close), > 0 = Auto dismiss after X seconds
     var autoClearSeconds: Int
-        get() = prefs.getInt("auto_clear_seconds", 8)
+        get() = prefs.getInt("auto_clear_seconds", 0)
         set(value) = prefs.edit().putInt("auto_clear_seconds", value).apply()
+
+    var geminiApiKey: String
+        get() = prefs.getString("gemini_api_key", "") ?: ""
+        set(value) = prefs.edit().putString("gemini_api_key", value).apply()
 }

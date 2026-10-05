@@ -57,6 +57,8 @@ class FloatingBubbleService : Service() {
     private var screenHeight = 1920
     private var screenDensity = 420
 
+    private var isProcessing = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -65,7 +67,11 @@ class FloatingBubbleService : Service() {
         ocrManager = OcrManager()
         translationManager = TranslationManager()
         overlayManager = OverlayManager(this) {
-            captureAndTranslate()
+            if (overlayManager.isShowingTranslations()) {
+                overlayManager.clearTranslationCards()
+            } else {
+                captureAndTranslate()
+            }
         }
 
         createNotificationChannel()
@@ -167,11 +173,14 @@ class FloatingBubbleService : Service() {
     }
 
     private fun captureAndTranslate() {
+        if (isProcessing) return
+        isProcessing = true
         overlayManager.setBubbleLoading(true)
 
         val image = imageReader?.acquireLatestImage()
         if (image == null) {
             overlayManager.setBubbleLoading(false)
+            isProcessing = false
             return
         }
 
@@ -180,6 +189,7 @@ class FloatingBubbleService : Service() {
 
         if (bitmap == null) {
             overlayManager.setBubbleLoading(false)
+            isProcessing = false
             return
         }
 
@@ -191,6 +201,7 @@ class FloatingBubbleService : Service() {
             onSuccess = { ocrBlocks ->
                 if (ocrBlocks.isEmpty()) {
                     overlayManager.setBubbleLoading(false)
+                    isProcessing = false
                     return@processImage
                 }
 
@@ -198,7 +209,7 @@ class FloatingBubbleService : Service() {
                     val deferredList = ocrBlocks.map { block ->
                         async {
                             val translated = translationManager.translateText(
-                                block.text, srcLang, targetLang, engineMode
+                                block.text, srcLang, targetLang, engineMode, prefs.geminiApiKey
                             )
                             Pair(translated, block.boundingBox)
                         }
@@ -207,10 +218,12 @@ class FloatingBubbleService : Service() {
                     val results = deferredList.awaitAll()
                     overlayManager.drawTranslationCards(results)
                     overlayManager.setBubbleLoading(false)
+                    isProcessing = false
                 }
             },
             onError = {
                 overlayManager.setBubbleLoading(false)
+                isProcessing = false
             }
         )
     }

@@ -6,9 +6,12 @@ import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
+import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 
@@ -17,8 +20,8 @@ class TranslationManager {
     private val translatorCache = mutableMapOf<String, Translator>()
     
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
     private fun getOnDeviceTranslator(sourceLang: String, targetLang: String): Translator {
@@ -36,19 +39,26 @@ class TranslationManager {
         text: String,
         sourceLang: String,
         targetLang: String,
-        engineMode: String = "on_device"
+        engineMode: String = "on_device",
+        geminiApiKey: String = ""
     ): String = withContext(Dispatchers.IO) {
         if (text.isBlank()) return@withContext ""
 
-        if (engineMode == "on_device") {
-            try {
-                return@withContext translateOnDevice(text, sourceLang, targetLang)
-            } catch (e: Exception) {
-                Log.w(TAG, "On-device translation failed, falling back to free cloud endpoint: ${e.message}")
-                return@withContext translateViaFreeCloud(text, sourceLang, targetLang)
+        when (engineMode) {
+            "gemini_ai" -> {
+                translateViaGeminiAI(text, sourceLang, targetLang, geminiApiKey)
             }
-        } else {
-            return@withContext translateViaFreeCloud(text, sourceLang, targetLang)
+            "on_device" -> {
+                try {
+                    translateOnDevice(text, sourceLang, targetLang)
+                } catch (e: Exception) {
+                    Log.w(TAG, "On-device translation failed, falling back to free cloud: ${e.message}")
+                    translateViaFreeCloud(text, sourceLang, targetLang)
+                }
+            }
+            else -> {
+                translateViaFreeCloud(text, sourceLang, targetLang)
+            }
         }
     }
 
@@ -72,6 +82,66 @@ class TranslationManager {
                 .addOnFailureListener { e ->
                     continuation.resumeWith(Result.failure(e))
                 }
+        }
+    }
+
+    private fun translateViaGeminiAI(
+        text: String,
+        sourceLang: String,
+        targetLang: String,
+        apiKey: String
+    ): String {
+        if (apiKey.isBlank()) {
+            Log.w(TAG, "Gemini API key is blank! Falling back to Free Cloud")
+            return translateViaFreeCloud(text, sourceLang, targetLang)
+        }
+
+        return try {
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey"
+            val prompt = "You are a professional screen translator for games and comics. Translate the following text from '$sourceLang' into '$targetLang' naturally and concisely. Output ONLY the translated text without any explanation, quotes or preamble:\n\n$text"
+
+            val jsonPayload = JSONObject().apply {
+                val contents = JSONArray().apply {
+                    val contentObj = JSONObject().apply {
+                        val parts = JSONArray().apply {
+                            val partObj = JSONObject().apply {
+                                put("text", prompt)
+                            }
+                            put(partObj)
+                        }
+                        put("parts", parts)
+                    }
+                    put(contentObj)
+                }
+                put("contents", contents)
+            }
+
+            val requestBody = jsonPayload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
+            val request = Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build()
+
+            val response = httpClient.newCall(request).execute()
+            val body = response.body?.string() ?: return translateViaFreeCloud(text, sourceLang, targetLang)
+
+            val rootJson = JSONObject(body)
+            if (rootJson.has("candidates")) {
+                val candidates = rootJson.getJSONArray("candidates")
+                if (candidates.length() > 0) {
+                    val candidate = candidates.getJSONObject(0)
+                    val content = candidate.getJSONObject("content")
+                    val parts = content.getJSONArray("parts")
+                    if (parts.length() > 0) {
+                        val translated = parts.getJSONObject(0).getString("text").trim()
+                        if (translated.isNotBlank()) return translated
+                    }
+                }
+            }
+            translateViaFreeCloud(text, sourceLang, targetLang)
+        } catch (e: Exception) {
+            Log.e(TAG, "Gemini API call failed, falling back to Free Cloud", e)
+            translateViaFreeCloud(text, sourceLang, targetLang)
         }
     }
 

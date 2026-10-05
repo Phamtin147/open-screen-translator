@@ -16,9 +16,14 @@ Các ứng dụng dịch màn hình thương mại (như *Tap to Translate Scree
 **Open Screen Translator** được thiết kế lại từ đầu với triết lý:
 - **Clean Code & Tối giản**: Không có bất kỳ dòng code quảng cáo hay tracking nào.
 - **Dịch Không Giới Hạn**: Dịch hàng triệu câu, cày game cả ngày không bao giờ bị khóa.
-- **Đa cơ chế dịch (Dual Mode)**:
+- **Đa cơ chế dịch (Triple Engine)**:
+  - *Google Gemini AI Mode*: Dịch bằng mô hình ngôn ngữ lớn (LLM) thông minh nhất, văn phong mượt mà, hỗ trợ cắm API Key miễn phí từ Google AI Studio (`aistudio.google.com`).
   - *On-Device Mode (ML Kit)*: Chạy trên chip điện thoại, không cần mạng, độ trễ < 100ms, bảo mật 100%.
-  - *Cloud Free Mode*: Kết nối thẳng tới endpoint dịch miễn phí không giới hạn của Google Translate không cần API Key, hoặc dễ dàng đổi sang LLM (DeepSeek/ChatGPT).
+  - *Cloud Free Mode*: Kết nối thẳng tới endpoint dịch miễn phí không giới hạn của Google Translate không cần API Key.
+- **Cơ chế Chạm Thông Minh (Tap to Toggle)**:
+  - Bấm vào bong bóng -> Quét và hiển thị bản dịch.
+  - Bấm lại vào bong bóng (icon dấu X) -> Tắt sạch các bản dịch ngay lập tức mà không làm che màn hình game/truyện.
+  - Cho phép tùy chỉnh thời gian tự tắt (0s = thủ công, hoặc 5s, 10s, 15s).
 
 ---
 

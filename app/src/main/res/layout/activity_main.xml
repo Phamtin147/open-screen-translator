@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
-            android:text="100% Mã Nguồn Mở • 0% Quảng Cáo • Dịch Không Giới Hạn"
+            android:text="100% Mã Nguồn Mở • 0% Quảng Cáo • Hỗ Trợ Gemini AI"
             android:textColor="@color/accent"
             android:textSize="13sp" />
 
@@ -98,7 +98,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cấu hình ngôn ngữ"
+                    android:text="Cấu hình ngôn ngữ &amp; Engine"
                     android:textColor="@color/text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -140,7 +140,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Chế độ dịch:"
+                    android:text="Bộ máy dịch thuật (Engine):"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
@@ -150,6 +150,66 @@
                     android:layout_height="48dp"
                     android:layout_marginTop="4dp"
                     android:backgroundTint="#FFFFFF" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- AI API Key Card -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/card_api_key"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="@color/card_background"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#334155"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cấu hình Google Gemini API Key"
+                    android:textColor="@color/text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Nhận key miễn phí không giới hạn tại: aistudio.google.com"
+                    android:textColor="@color/accent"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="Nhập Gemini API Key (AIzaSy...)"
+                    app:boxBackgroundColor="#0F172A"
+                    app:boxCornerRadiusBottomEnd="10dp"
+                    app:boxCornerRadiusBottomStart="10dp"
+                    app:boxCornerRadiusTopEnd="10dp"
+                    app:boxCornerRadiusTopStart="10dp"
+                    app:boxStrokeColor="@color/primary"
+                    app:passwordToggleEnabled="true"
+                    app:hintTextColor="@color/text_secondary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/et_gemini_api_key"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="textPassword"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+                </com.google.android.material.textfield.TextInputLayout>
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -175,17 +235,36 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Tùy biến hiển thị"
+                    android:text="Tùy biến hiển thị &amp; Thời gian"
                     android:textColor="@color/text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold" />
+
+                <!-- Auto-clear Timer -->
+                <TextView
+                    android:id="@+id/tv_auto_clear_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Tự đóng bản dịch: Tắt (Chỉ đóng khi chạm bong bóng)"
+                    android:textColor="@color/accent"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/slider_auto_clear"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:value="0"
+                    android:valueFrom="0"
+                    android:valueTo="30"
+                    android:stepSize="5" />
 
                 <!-- Opacity -->
                 <TextView
                     android:id="@+id/tv_opacity_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="8dp"
                     android:text="Độ trong suốt khung dịch: 90%"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />

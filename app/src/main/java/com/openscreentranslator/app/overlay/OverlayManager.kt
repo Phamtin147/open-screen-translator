@@ -31,9 +31,14 @@ class OverlayManager(
     private var bubbleParams: WindowManager.LayoutParams? = null
     private val activeTranslationViews = CopyOnWriteArrayList<View>()
 
+    private var autoClearRunnable: Runnable? = null
+    private var isShowing = false
+
     private fun dpToPx(dp: Int): Int {
         return (dp * context.resources.displayMetrics.density).toInt()
     }
+
+    fun isShowingTranslations(): Boolean = isShowing
 
     fun showFloatingBubble() {
         if (bubbleView != null) return
@@ -112,16 +117,36 @@ class OverlayManager(
                     icon.visibility = View.GONE
                     progress.visibility = View.VISIBLE
                 } else {
-                    icon.visibility = View.VISIBLE
                     progress.visibility = View.GONE
+                    icon.visibility = View.VISIBLE
+                    updateBubbleIcon()
                 }
+            }
+        }
+    }
+
+    private fun updateBubbleIcon() {
+        bubbleView?.let { view ->
+            val icon = view.findViewById<ImageView>(R.id.bubble_icon)
+            if (isShowing) {
+                icon.setImageResource(R.drawable.ic_close)
+            } else {
+                icon.setImageResource(R.drawable.ic_translate)
             }
         }
     }
 
     fun drawTranslationCards(translations: List<Pair<String, Rect>>) {
         mainHandler.post {
-            clearTranslationCards()
+            // Cancel any previous auto-clear timer
+            cancelAutoClearTimer()
+            clearTranslationViewsInternal()
+
+            if (translations.isEmpty()) {
+                isShowing = false
+                updateBubbleIcon()
+                return@post
+            }
 
             val alphaVal = (prefs.overlayOpacity * 255 / 100).coerceIn(0, 255)
             val textSizeSp = prefs.textSize.toFloat()
@@ -158,9 +183,10 @@ class OverlayManager(
                     y = rect.top
                 }
 
-                // Click on card to dismiss it
-                textView.setOnClickListener {
+                // Long press on a card to dismiss just this card
+                textView.setOnLongClickListener {
                     removeViewSafely(textView)
+                    true
                 }
 
                 try {
@@ -171,23 +197,43 @@ class OverlayManager(
                 }
             }
 
-            // Auto clear timer
-            val delay = prefs.autoClearSeconds
-            if (delay > 0) {
-                mainHandler.postDelayed({
+            isShowing = true
+            updateBubbleIcon()
+
+            // Schedule auto-clear only if user set it > 0 (0 = manual toggle only)
+            val delaySeconds = prefs.autoClearSeconds
+            if (delaySeconds > 0) {
+                autoClearRunnable = Runnable {
                     clearTranslationCards()
-                }, delay * 1000L)
+                }
+                mainHandler.postDelayed(autoClearRunnable!!, delaySeconds * 1000L)
             }
+        }
+    }
+
+    private fun cancelAutoClearTimer() {
+        autoClearRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            autoClearRunnable = null
         }
     }
 
     fun clearTranslationCards() {
         mainHandler.post {
-            for (view in activeTranslationViews) {
-                removeViewSafely(view)
-            }
-            activeTranslationViews.clear()
+            cancelAutoClearTimer()
+            clearTranslationViewsInternal()
+            isShowing = false
+            updateBubbleIcon()
         }
+    }
+
+    private fun clearTranslationViewsInternal() {
+        for (view in activeTranslationViews) {
+            try {
+                windowManager.removeView(view)
+            } catch (_: Exception) {}
+        }
+        activeTranslationViews.clear()
     }
 
     private fun removeViewSafely(view: View) {
@@ -195,17 +241,23 @@ class OverlayManager(
             windowManager.removeView(view)
         } catch (_: Exception) {}
         activeTranslationViews.remove(view)
+        if (activeTranslationViews.isEmpty()) {
+            isShowing = false
+            updateBubbleIcon()
+        }
     }
 
     fun removeFloatingBubble() {
         mainHandler.post {
-            clearTranslationCards()
+            cancelAutoClearTimer()
+            clearTranslationViewsInternal()
             bubbleView?.let {
                 try {
                     windowManager.removeView(it)
                 } catch (_: Exception) {}
                 bubbleView = null
             }
+            isShowing = false
         }
     }
 }

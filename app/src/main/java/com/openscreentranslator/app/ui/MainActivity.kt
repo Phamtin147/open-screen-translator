@@ -9,16 +9,20 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.card.MaterialCardView
 import com.google.android.material.slider.Slider
 import com.openscreentranslator.app.R
 import com.openscreentranslator.app.data.AppPreferences
@@ -35,6 +39,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var spinnerSource: Spinner
     private lateinit var spinnerTarget: Spinner
     private lateinit var spinnerMode: Spinner
+    private lateinit var cardApiKey: MaterialCardView
+    private lateinit var etGeminiApiKey: EditText
+    private lateinit var sliderAutoClear: Slider
+    private lateinit var tvAutoClearLabel: TextView
     private lateinit var sliderOpacity: Slider
     private lateinit var sliderTextSize: Slider
     private lateinit var tvOpacityLabel: TextView
@@ -62,9 +70,7 @@ class MainActivity : AppCompatActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        // Continue even if denied, but good practice
-    }
+    ) { _ -> }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -83,6 +89,10 @@ class MainActivity : AppCompatActivity() {
         spinnerSource = findViewById(R.id.spinner_source_lang)
         spinnerTarget = findViewById(R.id.spinner_target_lang)
         spinnerMode = findViewById(R.id.spinner_engine_mode)
+        cardApiKey = findViewById(R.id.card_api_key)
+        etGeminiApiKey = findViewById(R.id.et_gemini_api_key)
+        sliderAutoClear = findViewById(R.id.slider_auto_clear)
+        tvAutoClearLabel = findViewById(R.id.tv_auto_clear_label)
         sliderOpacity = findViewById(R.id.slider_opacity)
         sliderTextSize = findViewById(R.id.slider_text_size)
         tvOpacityLabel = findViewById(R.id.tv_opacity_label)
@@ -111,13 +121,22 @@ class MainActivity : AppCompatActivity() {
 
         // Engine modes
         val modes = listOf(
+            "Google Gemini AI (Dịch thông minh nhất)" to "gemini_ai",
             "On-Device (ML Kit - 100% Offline, 0% Data)" to "on_device",
-            "Cloud Free (Google Translate Endpoint - Không cần Key)" to "cloud_free"
+            "Cloud Free (Google Translate - Không cần Key)" to "cloud_free"
         )
         val modeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes.map { it.first })
         spinnerMode.adapter = modeAdapter
         val modeIndex = modes.indexOfFirst { it.second == prefs.engineMode }.coerceAtLeast(0)
         spinnerMode.setSelection(modeIndex)
+
+        // Gemini API Key
+        etGeminiApiKey.setText(prefs.geminiApiKey)
+
+        // Auto-clear slider
+        val currentAutoClear = prefs.autoClearSeconds.toFloat().coerceIn(0f, 30f)
+        sliderAutoClear.value = currentAutoClear
+        updateAutoClearLabel(currentAutoClear.toInt())
 
         // Sliders
         sliderOpacity.value = prefs.overlayOpacity.toFloat()
@@ -125,6 +144,16 @@ class MainActivity : AppCompatActivity() {
 
         sliderTextSize.value = prefs.textSize.toFloat()
         tvTextSizeLabel.text = "Cỡ chữ bản dịch: ${prefs.textSize}sp"
+    }
+
+    private fun updateAutoClearLabel(seconds: Int) {
+        if (seconds == 0) {
+            tvAutoClearLabel.text = "Tự đóng bản dịch: Tắt (Chỉ đóng khi chạm bong bóng)"
+            tvAutoClearLabel.setTextColor(getColor(R.color.accent))
+        } else {
+            tvAutoClearLabel.text = "Tự đóng bản dịch: Sau $seconds giây"
+            tvAutoClearLabel.setTextColor(getColor(R.color.text_primary))
+        }
     }
 
     private fun setupListeners() {
@@ -159,12 +188,27 @@ class MainActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
-        val modes = listOf("on_device", "cloud_free")
+        val modes = listOf("gemini_ai", "on_device", "cloud_free")
         spinnerMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 prefs.engineMode = modes[position]
+                cardApiKey.visibility = if (modes[position] == "gemini_ai") View.VISIBLE else View.GONE
             }
             override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        etGeminiApiKey.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                prefs.geminiApiKey = s?.toString()?.trim() ?: ""
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        sliderAutoClear.addOnChangeListener { _, value, _ ->
+            val seconds = value.toInt()
+            prefs.autoClearSeconds = seconds
+            updateAutoClearLabel(seconds)
         }
 
         sliderOpacity.addOnChangeListener { _, value, _ ->
@@ -209,7 +253,7 @@ class MainActivity : AppCompatActivity() {
 
         isServiceRunning = true
         tvStatusTitle.text = "Trạng thái: Đang hoạt động"
-        tvStatusDesc.text = "Bong bóng dịch đang nổi trên màn hình. Mở game/app khác và chạm vào để dịch."
+        tvStatusDesc.text = "Bong bóng dịch đang nổi trên màn hình. Chạm vào bong bóng để Dịch / Đóng bản dịch."
         btnToggleService.text = "DỪNG DỊCH NỀN"
         btnToggleService.setBackgroundColor(getColor(android.R.color.holo_red_dark))
     }
