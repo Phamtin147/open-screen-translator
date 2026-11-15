@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.Image
@@ -23,19 +22,22 @@ import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.openscreentranslator.app.R
 import com.openscreentranslator.app.data.AppPreferences
 import com.openscreentranslator.app.ocr.OcrManager
+import com.openscreentranslator.app.ocr.ReadingDirection
 import com.openscreentranslator.app.overlay.OverlayManager
 import com.openscreentranslator.app.translation.TranslationManager
 import com.openscreentranslator.app.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 
@@ -58,14 +60,16 @@ class FloatingBubbleService : Service() {
     private var screenDensity = 420
 
     private var isProcessing = false
+    private var lastNoticeTimestamp = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        _isRunning.value = true
         prefs = AppPreferences(this)
         ocrManager = OcrManager()
-        translationManager = TranslationManager()
+        translationManager = TranslationManager(applicationContext)
         overlayManager = OverlayManager(this) {
             if (overlayManager.isShowingTranslations()) {
                 overlayManager.clearTranslationCards()
@@ -174,10 +178,17 @@ class FloatingBubbleService : Service() {
 
     private fun captureAndTranslate() {
         if (isProcessing) return
+        val reader = imageReader ?: return
         isProcessing = true
         overlayManager.setBubbleLoading(true)
 
-        val image = imageReader?.acquireLatestImage()
+        val image: Image? = try {
+            reader.acquireLatestImage()
+        } catch (e: Exception) {
+            Log.e(TAG, "acquireLatestImage error", e)
+            null
+        }
+
         if (image == null) {
             overlayManager.setBubbleLoading(false)
             isProcessing = false
@@ -187,17 +198,21 @@ class FloatingBubbleService : Service() {
         val bitmap = imageToBitmap(image)
         image.close()
 
-        if (bitmap == null) {
-            overlayManager.setBubbleLoading(false)
-            isProcessing = false
-            return
-        }
-
         val srcLang = prefs.sourceLanguage
         val targetLang = prefs.targetLanguage
         val engineMode = prefs.engineMode
+        val comicMode = prefs.comicModeEnabled
+        val readingDir = if (prefs.readingDirection == AppPreferences.DIRECTION_LTR) {
+            ReadingDirection.COMIC_LTR
+        } else {
+            ReadingDirection.MANGA_RTL
+        }
 
-        ocrManager.processImage(bitmap, srcLang,
+        ocrManager.processImage(
+            bitmap = bitmap,
+            languageCode = srcLang,
+            comicModeEnabled = comicMode,
+            readingDirection = readingDir,
             onSuccess = { ocrBlocks ->
                 if (ocrBlocks.isEmpty()) {
                     overlayManager.setBubbleLoading(false)
@@ -206,19 +221,33 @@ class FloatingBubbleService : Service() {
                 }
 
                 serviceScope.launch {
-                    val deferredList = ocrBlocks.map { block ->
-                        async {
-                            val translated = translationManager.translateText(
-                                block.text, srcLang, targetLang, engineMode, prefs.geminiApiKey
-                            )
-                            Pair(translated, block.boundingBox)
-                        }
-                    }
+                    try {
+                        val pageResult = translationManager.translatePageBubbles(
+                            blocks = ocrBlocks,
+                            sourceLang = srcLang,
+                            targetLang = targetLang,
+                            engineMode = engineMode,
+                            geminiApiKey = prefs.geminiApiKey,
+                            wholePageContextEnabled = comicMode && prefs.wholePageContextEnabled,
+                            preferredHymtVariant = prefs.hymtModelVariant
+                        )
 
-                    val results = deferredList.awaitAll()
-                    overlayManager.drawTranslationCards(results)
-                    overlayManager.setBubbleLoading(false)
-                    isProcessing = false
+                        pageResult.fallbackNotice?.let { notice ->
+                            val now = System.currentTimeMillis()
+                            if (now - lastNoticeTimestamp > 8000L) {
+                                lastNoticeTimestamp = now
+                                Toast.makeText(this@FloatingBubbleService, notice, Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
+                        overlayManager.drawTranslationCards(
+                            results = pageResult.translatedBlocks,
+                            showBubbleOrderIndex = comicMode && pageResult.translatedBlocks.size > 1
+                        )
+                    } finally {
+                        overlayManager.setBubbleLoading(false)
+                        isProcessing = false
+                    }
                 }
             },
             onError = {
@@ -228,7 +257,7 @@ class FloatingBubbleService : Service() {
         )
     }
 
-    private fun imageToBitmap(image: Image): Bitmap? {
+    private fun imageToBitmap(image: Image): Bitmap {
         val planes = image.planes
         val buffer: ByteBuffer = planes[0].buffer
         val pixelStride = planes[0].pixelStride
@@ -245,21 +274,20 @@ class FloatingBubbleService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Open Screen Translator Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Running background translation service"
-            }
-            val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Open Screen Translator Service",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "Running background translation service"
         }
+        val nm = getSystemService(NotificationManager::class.java)
+        nm.createNotificationChannel(channel)
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        _isRunning.value = false
         serviceScope.cancel()
         overlayManager.removeFloatingBubble()
         ocrManager.close()
@@ -267,5 +295,10 @@ class FloatingBubbleService : Service() {
         virtualDisplay?.release()
         imageReader?.close()
         mediaProjection?.stop()
+    }
+
+    companion object {
+        private val _isRunning = MutableStateFlow(false)
+        val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
     }
 }

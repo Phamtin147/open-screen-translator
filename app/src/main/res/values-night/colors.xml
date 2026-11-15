@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Celestial Star Atlas: Nighttime Observatory Navy Register -->
+    <color name="surface_ground">#081121</color>
+    <color name="surface_card">#0E1A2E</color>
+    <color name="surface_recessed">#13223B</color>
+
+    <color name="hairline_stroke">#1E3252</color>
+    <color name="hairline_strong">#39537D</color>
+
+    <color name="ink_primary">#F4F7FB</color>
+    <color name="ink_heading">#E2D9C5</color>
+    <color name="ink_secondary">#A6B5CC</color>
+    <color name="ink_muted">#D8C7A8</color>
+
+    <color name="accent_vermilion">#C93E14</color>
+    <color name="accent_vermilion_text">#EE6D43</color>
+    <color name="accent_vermilion_soft">#2D1819</color>
+    <color name="on_accent">#FFFFFF</color>
+
+    <color name="status_active">#34D399</color>
+    <color name="status_warning">#FBBF24</color>
+    <color name="status_warning_surface">#2C220B</color>
+    <color name="status_danger">#F87171</color>
+    <color name="status_danger_fill">#B91C1C</color>
+
+    <color name="overlay_card_bg">#091326</color>
+    <color name="overlay_card_stroke">#D8C7A8</color>
+    <color name="overlay_card_text">#F4F7FB</color>
+    <color name="overlay_badge_bg">#EE6D43</color>
+    <color name="overlay_badge_text">#FFFFFF</color>
+</resources>

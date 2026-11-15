@@ -21,14 +21,31 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Checkout Pinned llama.cpp Source
+        uses: actions/checkout@v4
+        with:
+          repository: ggml-org/llama.cpp
+          ref: 278a89cb787c1d2b4cff9748b1df9cfd2aa69976
+          path: third_party/llama.cpp
+          fetch-depth: 1
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install Android NDK 28.2 & CMake 3.22.1
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="$(find "$ANDROID_HOME" -name sdkmanager -type f | head -n 1)"
+          fi
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "ndk;28.2.13676358" "cmake;3.22.1"
+
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
@@ -36,15 +53,15 @@ jobs:
       - name: Determine Version
         id: versioning
         run: |
-          VERSION="1.0.${{ github.run_number }}"
+          VERSION="1.1.${{ github.run_number }}"
           TAG_NAME="v$VERSION"
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "TAG_NAME=$TAG_NAME" >> $GITHUB_ENV
           echo "Building version $VERSION (Tag: $TAG_NAME)"
 
-      - name: Build APK with Gradle
+      - name: Run Unit Tests, Lint & Build APK
         run: |
-          ./gradlew assembleDebug
+          ./gradlew testDebugUnitTest lintDebug assembleDebug --console=plain
 
       - name: Rename Output APK
         run: |
@@ -69,11 +86,11 @@ jobs:
             - **Commit**: `${{ github.sha }}`
             - **Branch**: `${{ github.ref_name }}`
 
-            #### ✨ Tính năng:
-            - 100% Mã nguồn mở, 0% Quảng cáo, Không giới hạn lượt dịch
-            - Nhận diện chữ Offline bằng Google ML Kit OCR
-            - Dịch On-Device hoặc Free Cloud không cần API Key
-            - Bong bóng nổi đa năng kéo thả trên màn hình
+            #### ✨ Có gì mới:
+            - **Hy-MT2-1.8B Offline AI (`llama.cpp` JNI)**: Dịch offline chất lượng cao hơn cho hội thoại/truyện tranh với trình tải GGUF trực tiếp từ Hugging Face (`UD-IQ2_M`, `Q3_K_S`, `Q4_K_M`)
+            - **Chế độ Đọc Truyện Tranh (Comic Mode)**: Tự nối dòng vỡ/gạch nối, gom cụm bong bóng thoại, hỗ trợ chiều đọc **Manga R→L** & **Webtoon L→R**, dịch ngữ cảnh cả trang trên Hy-MT2 & Gemini
+            - **Giao diện mới Celestial Star Atlas**: Material 3 hỗ trợ đầy đủ 2 chế độ **Ban ngày / Ban đêm**, bảng mô phỏng tương tác và bộ icon Adaptive + Monochrome mới
+            - Hỗ trợ đầy đủ Google ML Kit Offline, Gemini AI & Google Translate Cloud
 
             📥 **Tải file APK cài đặt bên dưới:**
           files: release-artifacts/*.apk

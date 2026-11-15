@@ -1,0 +1,17 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Active high-contrast star & viewfinder on vermilion badge (>4.9:1) -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M4,6.5C4,5.4 4.9,4.5 6,4.5H15C16.1,4.5 17,5.4 17,6.5V12.5C17,13.6 16.1,14.5 15,14.5H9L5.5,17.5V14.5H6C4.9,14.5 4,13.6 4,12.5V6.5Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18.5,10.5L19.5,13.2L22.2,14.2L19.5,15.2L18.5,18L17.5,15.2L14.8,14.2L17.5,13.2Z" />
+</vector>

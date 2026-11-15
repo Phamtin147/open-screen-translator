@@ -1,0 +1,19 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer astrolabe dial ring -->
+    <path
+        android:pathData="M54,27A27,27 0 1,1 53.99,27Z"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFFFFFFF" />
+    <!-- Primary speech-bubble pane (foreground lower-left) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M34,46h28a6,6 0 0,1 6,6v14a6,6 0 0,1 -6,6H45l-7,6v-6h-4a6,6 0 0,1 -6,-6V52a6,6 0 0,1 6,-6z" />
+    <!-- Signal 4-point celestial compass star (upper-right) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M68,31L70.4,39.6L79,42L70.4,44.4L68,53L65.6,44.4L57,42L65.6,39.6Z" />
+</vector>

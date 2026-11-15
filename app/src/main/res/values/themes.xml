@@ -1,8 +1,55 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
     <style name="Theme.OpenScreenTranslator" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/primary</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:statusBarColor">@color/background</item>
-        <item name="android:windowBackground">@color/background</item>
+        <item name="colorPrimary">@color/accent_vermilion</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorPrimaryContainer">@color/accent_vermilion_soft</item>
+        <item name="colorOnPrimaryContainer">@color/ink_primary</item>
+
+        <item name="colorSecondary">@color/ink_muted</item>
+        <item name="colorOnSecondary">@color/surface_card</item>
+        <item name="colorSecondaryContainer">@color/surface_recessed</item>
+        <item name="colorOnSecondaryContainer">@color/ink_primary</item>
+
+        <item name="android:colorBackground">@color/surface_ground</item>
+        <item name="android:windowBackground">@color/surface_ground</item>
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorOnSurface">@color/ink_primary</item>
+        <item name="colorSurfaceVariant">@color/surface_recessed</item>
+        <item name="colorOnSurfaceVariant">@color/ink_secondary</item>
+        <item name="colorOutline">@color/hairline_strong</item>
+        <item name="colorOutlineVariant">@color/hairline_stroke</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="AtlasCardStyle" parent="Widget.Material3.CardView.Outlined">
+        <item name="cardBackgroundColor">@color/surface_card</item>
+        <item name="strokeColor">@color/hairline_stroke</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cardCornerRadius">14dp</item>
+        <item name="cardElevation">0dp</item>
+    </style>
+
+    <style name="AtlasSectionHeading">
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">serif</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/ink_heading</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <style name="AtlasCircleImage">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="AtlasTabularValue">
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/ink_primary</item>
+        <item name="android:fontFeatureSettings">tnum</item>
     </style>
 </resources>

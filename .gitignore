@@ -9,3 +9,4 @@ Thumbs.db
 captures/
 .externalNativeBuild
 .cxx
+third_party/llama.cpp/

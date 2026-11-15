@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Bilingual Pocket Dictionary & Ruby Gloss</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 390px; height: 844px; overflow: hidden;
+    font-family: system-ui, -apple-system, Roboto, sans-serif;
+    background: #F7F7F4; color: #141619;
+    display: flex; flex-direction: column; padding: 20px 16px 16px;
+  }
+  .topbar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 14px; border-bottom: 1px solid #E3E2DC; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 28px; height: 28px; border-radius: 7px; background: #0F766E; color: #FFF; font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+  h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .pill { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: #E6F4F1; color: #0F766E; font-variant-numeric: tabular-nums; }
+  .hero-block { padding: 16px 0; border-bottom: 1px solid #E3E2DC; }
+  .status-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .status-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .status-meta { font-size: 12px; color: #525860; font-variant-numeric: tabular-nums; }
+  .btn-primary {
+    width: 100%; height: 50px; border: 0; border-radius: 12px;
+    background: #0F766E; color: #FFFFFF; font-size: 15px; font-weight: 600;
+  }
+  .section { padding: 14px 0; border-bottom: 1px solid #E3E2DC; }
+  .sec-label { font-size: 12px; font-weight: 600; color: #525860; margin-bottom: 8px; }
+  .lang-row { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 8px; align-items: center; }
+  .field { height: 46px; background: #FFFFFF; border: 1px solid #D9D8D1; border-radius: 10px; padding: 0 12px; display: flex; flex-direction: column; justify-content: center; }
+  .field-k { font-size: 10px; color: #525860; }
+  .field-v { font-size: 14px; font-weight: 600; }
+  .swap { height: 46px; border: 1px solid #D9D8D1; border-radius: 10px; background: #FFFFFF; display: grid; place-items: center; font-weight: 600; }
+  .engine-list { display: flex; flex-direction: column; gap: 6px; }
+  .eng { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 10px; background: #FFFFFF; border: 1px solid #E3E2DC; }
+  .eng.active { border: 1.5px solid #0F766E; background: #F0FAF8; }
+  .eng-name { font-size: 14px; font-weight: 600; }
+  .eng-sub { font-size: 11px; color: #525860; font-variant-numeric: tabular-nums; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; background: #ECEBE5; padding: 3px; border-radius: 10px; margin-bottom: 10px; }
+  .seg div { text-align: center; padding: 8px; font-size: 12px; font-weight: 600; border-radius: 8px; }
+  .seg .on { background: #FFFFFF; color: #141619; }
+  .preview { background: #141619; color: #F7F7F4; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .bubble { background: rgba(255,255,255,0.1); border: 1px solid rgba(45,212,191,0.5); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: flex; justify-content: space-between; }
+  .idx { color: #2DD4BF; font-weight: 700; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><div class="mark">訳</div><h1>Open Screen Translator</h1></div>
+    <span class="pill">Hy-MT2 · 689 MB</span>
+  </div>
+  <div class="hero-block">
+    <div class="status-line">
+      <div class="status-title">Sẵn sàng dịch</div>
+      <div class="status-meta">JA → VI · 0 quảng cáo</div>
+    </div>
+    <button class="btn-primary">Bật bong bóng dịch màn hình</button>
+  </div>
+  <div class="section">
+    <div class="sec-label">Cặp ngôn ngữ</div>
+    <div class="lang-row">
+      <div class="field"><span class="field-k">Nguồn</span><span class="field-v">Tiếng Nhật (JA)</span></div>
+      <div class="swap">⇄</div>
+      <div class="field"><span class="field-k">Đích</span><span class="field-v">Tiếng Việt (VI)</span></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="sec-label">Bộ máy dịch Offline & Cloud</div>
+    <div class="engine-list">
+      <div class="eng active"><div><div class="eng-name">Hy-MT2 1.8B (GGUF)</div><div class="eng-sub">Ngữ cảnh cả trang · Đã tải 689 MB</div></div><span class="pill">Offline</span></div>
+      <div class="eng"><div><div class="eng-name">Google Gemini AI</div><div class="eng-sub">API Key cá nhân</div></div><span class="eng-sub">Online</span></div>
+      <div class="eng"><div><div class="eng-name">ML Kit / Cloud Free</div><div class="eng-sub">Dự phòng nhẹ</div></div><span class="eng-sub">Sẵn sàng</span></div>
+    </div>
+  </div>
+  <div class="section" style="border-bottom:0">
+    <div class="sec-label">Chế độ đọc truyện (Gom dòng & Ngữ cảnh)</div>
+    <div class="seg"><div class="on">Manga Nhật (Phải → Trái)</div><div>Comic / Webtoon (Trái → Phải)</div></div>
+    <div class="preview">
+      <div class="bubble"><span>Cẩn thận! Phía sau cậu kìa!</span><span class="idx">#1</span></div>
+      <div class="bubble"><span>Hả? Chuyện gì vậy?!</span><span class="idx">#2</span></div>
+    </div>
+  </div>
+</body>
+</html>

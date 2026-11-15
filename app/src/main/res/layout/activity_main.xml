@@ -1,44 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
+    android:clipToPadding="false"
     android:fillViewport="true">
 
     <LinearLayout
+        android:id="@+id/mainContentContainer"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="20dp">
+        android:paddingHorizontal="@dimen/atlas_horizontal_margin"
+        android:paddingTop="12dp"
+        android:paddingBottom="28dp">
 
-        <!-- App Header -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Open Screen Translator"
-            android:textColor="@color/text_primary"
-            android:textSize="24sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="100% Mã Nguồn Mở • 0% Quảng Cáo • Hỗ Trợ Gemini AI"
-            android:textColor="@color/accent"
-            android:textSize="13sp" />
-
-        <!-- Status Card -->
-        <com.google.android.material.card.MaterialCardView
+        <!-- TOP ATLAS HEADER -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#334155"
-            app:strokeWidth="1dp">
+            android:layout_marginBottom="16dp"
+            android:gravity="center_vertical"
+            android:minHeight="52dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.imageview.ShapeableImageView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@string/app_name"
+                android:src="@mipmap/ic_launcher_round"
+                app:shapeAppearanceOverlay="@style/AtlasCircleImage" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="serif"
+                    android:text="@string/app_name"
+                    android:textColor="@color/ink_primary"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:text="@string/app_subtitle"
+                    android:textColor="@color/ink_secondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnThemeMode"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/theme_toggle_cd"
+                android:minHeight="48dp"
+                android:paddingHorizontal="12dp"
+                android:text="@string/theme_system"
+                android:textAllCaps="false"
+                android:textColor="@color/ink_primary"
+                android:textSize="12sp"
+                app:cornerRadius="10dp"
+                app:icon="@drawable/ic_theme_mode"
+                app:iconSize="16dp"
+                app:iconTint="@color/ink_primary"
+                app:strokeColor="@color/hairline_strong"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
+
+        <!-- HERO COMMAND CARD: SERVICE TELEMETRY & PRIMARY CTA -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/AtlasCardStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -46,48 +92,113 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
-                    android:id="@+id/tv_status_title"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Trạng thái: Chưa kích hoạt"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_reticle_star" />
+
+                    <TextView
+                        android:id="@+id/tvStatusHeadline"
+                        style="@style/AtlasSectionHeading"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="Sẵn sàng dịch trên mọi ứng dụng"
+                        android:textSize="17sp" />
+
+                    <View
+                        android:id="@+id/viewStatusDot"
+                        android:layout_width="9dp"
+                        android:layout_height="9dp"
+                        android:background="@drawable/dot_status_idle" />
+
+                    <TextView
+                        android:id="@+id/tvStatusBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:fontFeatureSettings="tnum"
+                        android:text="TẠM DỪNG"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <TextView
-                    android:id="@+id/tv_status_desc"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvActiveSummary"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Nhấn nút bên dưới để khởi động bong bóng dịch chạy nền."
-                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="6dp"
+                    android:fontFeatureSettings="tnum"
+                    android:text="EN → VI · Google ML Kit · Manga R→L"
+                    android:textColor="@color/ink_secondary"
                     android:textSize="13sp" />
+
+                <!-- Permission warning strip shown only when SYSTEM_ALERT_WINDOW is missing -->
+                <LinearLayout
+                    android:id="@+id/layoutOverlayPermission"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_warning_strip"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="8dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:text="@string/permission_overlay_needed"
+                        android:textColor="@color/status_warning"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnGrantOverlay"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="@string/grant_overlay_btn"
+                        android:textColor="@color/accent_vermilion_text"
+                        android:textStyle="bold" />
+                </LinearLayout>
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_toggle_service"
+                    android:id="@+id/btnToggleService"
                     android:layout_width="match_parent"
-                    android:layout_height="56dp"
-                    android:layout_marginTop="16dp"
-                    android:text="BẬT DỊCH NỀN"
-                    android:textColor="#FFFFFF"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:minHeight="52dp"
+                    android:text="@string/start_service"
+                    android:textAllCaps="false"
+                    android:textColor="@color/on_accent"
                     android:textSize="15sp"
                     android:textStyle="bold"
+                    app:backgroundTint="@color/accent_vermilion"
                     app:cornerRadius="12dp" />
-
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Settings Card -->
+        <!-- CARD 01: LANGUAGES & TRANSLATION ENGINE -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AtlasCardStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#334155"
-            app:strokeWidth="1dp">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -96,135 +207,498 @@
                 android:padding="16dp">
 
                 <TextView
+                    style="@style/AtlasSectionHeading"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Cấu hình ngôn ngữ &amp; Engine"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Cặp ngôn ngữ &amp; Bộ dịch AI" />
+
+                <!-- Language Dropdowns + 48dp Swap Button -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilSourceLang"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="Ngôn ngữ gốc"
+                        app:boxBackgroundColor="@color/surface_recessed"
+                        app:boxCornerRadiusBottomEnd="10dp"
+                        app:boxCornerRadiusBottomStart="10dp"
+                        app:boxCornerRadiusTopEnd="10dp"
+                        app:boxCornerRadiusTopStart="10dp"
+                        app:boxStrokeColor="@color/hairline_strong">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/dropdownSourceLang"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:minHeight="48dp"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="13sp"
+                            tools:ignore="LabelFor" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <ImageButton
+                        android:id="@+id/btnSwapLanguages"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginHorizontal="8dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/swap_languages_cd"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_swap_horiz" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilTargetLang"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="Dịch sang"
+                        app:boxBackgroundColor="@color/surface_recessed"
+                        app:boxCornerRadiusBottomEnd="10dp"
+                        app:boxCornerRadiusBottomStart="10dp"
+                        app:boxCornerRadiusTopEnd="10dp"
+                        app:boxCornerRadiusTopStart="10dp"
+                        app:boxStrokeColor="@color/hairline_strong">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/dropdownTargetLang"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:minHeight="48dp"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="13sp"
+                            tools:ignore="LabelFor" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="Chọn bộ dịch"
+                    android:textColor="@color/ink_primary"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
-                <!-- Source Language -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Ngôn ngữ nguồn (gốc):"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/spinner_source_lang"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:backgroundTint="#FFFFFF" />
-
-                <!-- Target Language -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Ngôn ngữ dịch ra (đích):"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/spinner_target_lang"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:backgroundTint="#FFFFFF" />
-
-                <!-- Mode Selection -->
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Bộ máy dịch thuật (Engine):"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <Spinner
-                    android:id="@+id/spinner_engine_mode"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="4dp"
-                    android:backgroundTint="#FFFFFF" />
-
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- AI API Key Card -->
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/card_api_key"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#334155"
-            app:strokeWidth="1dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Cấu hình Google Gemini API Key"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="Nhận key miễn phí không giới hạn tại: aistudio.google.com"
-                    android:textColor="@color/accent"
-                    android:textSize="12sp" />
-
-                <com.google.android.material.textfield.TextInputLayout
+                <!-- Engine Row 1: Hy-MT2-1.8B AI (GGUF Offline) -->
+                <LinearLayout
+                    android:id="@+id/rowEngineHymt"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:hint="Nhập Gemini API Key (AIzaSy...)"
-                    app:boxBackgroundColor="#0F172A"
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:boxStrokeColor="@color/primary"
-                    app:passwordToggleEnabled="true"
-                    app:hintTextColor="@color/text_secondary">
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_option_unselected"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="54dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/et_gemini_api_key"
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Hy-MT2-1.8B AI (GGUF)"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Model dịch truyện &amp; hội thoại offline qua llama.cpp"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvHymtEngineTag"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFeatureSettings="tnum"
+                        android:text="CHƯA TẢI"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Engine Row 2: Google ML Kit Offline -->
+                <LinearLayout
+                    android:id="@+id/rowEngineMlKit"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_option_unselected"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="54dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Google ML Kit Offline"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Nhẹ (~30 MB), tự động fallback Cloud nếu lỗi"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFeatureSettings="tnum"
+                        android:text="OFFLINE NHẸ"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Engine Row 3: Gemini AI -->
+                <LinearLayout
+                    android:id="@+id/rowEngineGemini"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:background="@drawable/bg_option_unselected"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="54dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Gemini AI (Bring Key)"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Dịch cả trang 1 lần bằng API Key miễn phí"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="CLOUD AI"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- Engine Row 4: Google Free Cloud -->
+                <LinearLayout
+                    android:id="@+id/rowEngineCloud"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_option_unselected"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="54dp"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Google Translate Cloud"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="Không cần tải gói, yêu cầu có kết nối mạng"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="CÓ MẠNG"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- CONTEXTUAL DRAWER: HY-MT2 MODEL MANAGER -->
+                <LinearLayout
+                    android:id="@+id/layoutHymtManager"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_preview_plate"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFeatureSettings="tnum"
+                        android:text="Trình quản lý model GGUF (Hugging Face)"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/toggleHymtVariant"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:inputType="textPassword"
-                        android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:layout_marginTop="10dp"
+                        app:selectionRequired="true"
+                        app:singleSelection="true">
 
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVarCompact"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFeatureSettings="tnum"
+                            android:minHeight="52dp"
+                            android:paddingHorizontal="6dp"
+                            android:text="IQ2_M&#10;689 MB"
+                            android:textAllCaps="false"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="11sp"
+                            app:backgroundTint="@color/selector_toggle_bg"
+                            app:strokeColor="@color/selector_toggle_stroke" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVarBalanced"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFeatureSettings="tnum"
+                            android:minHeight="52dp"
+                            android:paddingHorizontal="6dp"
+                            android:text="Q3_K_S&#10;832 MB"
+                            android:textAllCaps="false"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="11sp"
+                            app:backgroundTint="@color/selector_toggle_bg"
+                            app:strokeColor="@color/selector_toggle_stroke" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnVarQuality"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:fontFeatureSettings="tnum"
+                            android:minHeight="52dp"
+                            android:paddingHorizontal="6dp"
+                            android:text="Q4_K_M&#10;1.08 GB"
+                            android:textAllCaps="false"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="11sp"
+                            app:backgroundTint="@color/selector_toggle_bg"
+                            app:strokeColor="@color/selector_toggle_stroke" />
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                    <TextView
+                        android:id="@+id/tvModelVariantDesc"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFeatureSettings="tnum"
+                        android:text="Cân bằng giữa ngữ nghĩa tự nhiên và tốc độ (~832 MB)."
+                        android:textColor="@color/ink_secondary"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:id="@+id/layoutDownloadProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/progressModelDownload"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            app:indicatorColor="@color/accent_vermilion"
+                            app:trackColor="@color/hairline_stroke"
+                            app:trackCornerRadius="4dp"
+                            app:trackThickness="6dp" />
+
+                        <TextView
+                            android:id="@+id/tvDownloadProgressStats"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:fontFeatureSettings="tnum"
+                            android:text="0 / 832 MB · Đang kết nối Hugging Face..."
+                            android:textColor="@color/ink_primary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnDownloadOrLoadModel"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:minHeight="48dp"
+                            android:text="Tải model GGUF"
+                            android:textAllCaps="false"
+                            android:textColor="@color/on_accent"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            app:backgroundTint="@color/accent_vermilion"
+                            app:cornerRadius="10dp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnDeleteModel"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:minHeight="48dp"
+                            android:text="Xóa file"
+                            android:textAllCaps="false"
+                            android:textColor="@color/status_danger"
+                            android:textSize="13sp"
+                            android:visibility="gone"
+                            app:cornerRadius="10dp"
+                            app:strokeColor="@color/status_danger"
+                            app:strokeWidth="1dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- CONTEXTUAL DRAWER: GEMINI API KEY -->
+                <LinearLayout
+                    android:id="@+id/layoutGeminiConfig"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="Gemini API Key (Google AI Studio)"
+                        app:boxBackgroundColor="@color/surface_recessed"
+                        app:boxCornerRadiusBottomEnd="10dp"
+                        app:boxCornerRadiusBottomStart="10dp"
+                        app:boxCornerRadiusTopEnd="10dp"
+                        app:boxCornerRadiusTopStart="10dp"
+                        app:boxStrokeColor="@color/hairline_strong"
+                        app:endIconMode="password_toggle">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etGeminiApiKey"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword"
+                            android:minHeight="48dp"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="13sp" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:id="@+id/tvGetApiKey"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:minHeight="48dp"
+                        android:paddingHorizontal="4dp"
+                        android:text="Lấy API Key miễn phí tại aistudio.google.com →"
+                        android:textColor="@color/accent_vermilion_text"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- UI Appearance Card -->
+        <!-- CARD 02: COMIC READING MODE & LIVE CALIBRATION PLATE -->
         <com.google.android.material.card.MaterialCardView
+            style="@style/AtlasCardStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:layout_marginBottom="24dp"
-            app:cardBackgroundColor="@color/card_background"
-            app:cardCornerRadius="16dp"
-            app:cardElevation="0dp"
-            app:strokeColor="#334155"
-            app:strokeWidth="1dp">
+            android:layout_marginBottom="16dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -233,72 +707,317 @@
                 android:padding="16dp">
 
                 <TextView
+                    style="@style/AtlasSectionHeading"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Tùy biến hiển thị &amp; Thời gian"
-                    android:textColor="@color/text_primary"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:layout_marginBottom="8dp"
+                    android:text="Chế độ đọc truyện tranh" />
 
-                <!-- Auto-clear Timer -->
+                <!-- Toggle 1: Multi-line unwrap + bubble clustering -->
+                <LinearLayout
+                    android:id="@+id/layoutComicModeRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="52dp"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Gộp dòng &amp; cụm bóng thoại"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Nối chữ đứt dòng và gộp mảnh OCR cùng bong bóng"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchComicMode"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true" />
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="6dp"
+                    android:background="@color/hairline_stroke" />
+
+                <!-- Toggle 2: Whole-page cross-bubble context -->
+                <LinearLayout
+                    android:id="@+id/layoutWholePageRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:minHeight="52dp"
+                    android:orientation="horizontal"
+                    android:paddingVertical="4dp">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dịch toàn trang theo ngữ cảnh"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Giữ đúng đại từ &amp; mạch thoại trên Hy-MT2 / Gemini"
+                            android:textColor="@color/ink_secondary"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/switchWholePageContext"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true" />
+                </LinearLayout>
+
                 <TextView
-                    android:id="@+id/tv_auto_clear_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:text="Tự đóng bản dịch: Tắt (Chỉ đóng khi chạm bong bóng)"
-                    android:textColor="@color/accent"
-                    android:textSize="13sp" />
+                    android:layout_marginBottom="6dp"
+                    android:text="Chiều đọc thứ tự bóng thoại"
+                    android:textColor="@color/ink_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/slider_auto_clear"
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/toggleReadingDirection"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="0"
-                    android:valueFrom="0"
-                    android:valueTo="30"
-                    android:stepSize="5" />
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
 
-                <!-- Opacity -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDirRtl"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="Manga (Phải → Trái)"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="12sp"
+                        app:backgroundTint="@color/selector_toggle_bg"
+                        app:strokeColor="@color/selector_toggle_stroke" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDirLtr"
+                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:minHeight="48dp"
+                        android:text="Webtoon (Trái → Phải)"
+                        android:textAllCaps="false"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="12sp"
+                        app:backgroundTint="@color/selector_toggle_bg"
+                        app:strokeColor="@color/selector_toggle_stroke" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
+
+                <!-- Signature Interactive Preview Plate -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Mô phỏng thứ tự đọc &amp; thẻ nổi"
+                        android:textColor="@color/ink_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:id="@+id/tvPreviewSpec"
+                        style="@style/AtlasTabularValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="R→L · 92% · 14sp"
+                        android:textColor="@color/ink_muted"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <com.openscreentranslator.app.ui.ComicPreviewView
+                    android:id="@+id/comicPreviewView"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/atlas_preview_height"
+                    android:background="@drawable/bg_preview_plate" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- CARD 03: OVERLAY CALIBRATION SLIDERS -->
+        <com.google.android.material.card.MaterialCardView
+            style="@style/AtlasCardStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
                 <TextView
-                    android:id="@+id/tv_opacity_label"
+                    style="@style/AtlasSectionHeading"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Độ trong suốt khung dịch: 90%"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:layout_marginBottom="10dp"
+                    android:text="Hiệu chỉnh thẻ dịch nổi" />
 
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/slider_opacity"
+                <!-- Slider 1: Opacity -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:value="90"
-                    android:valueFrom="20"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Độ mờ nền thẻ"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvOpacityValue"
+                        style="@style/AtlasTabularValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="92%" />
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderOpacity"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/slider_opacity_cd"
+                    android:stepSize="1"
+                    android:value="92"
+                    android:valueFrom="65"
                     android:valueTo="100"
-                    android:stepSize="5" />
+                    app:labelBehavior="gone"
+                    app:thumbColor="@color/ink_primary"
+                    app:trackColorActive="@color/ink_primary"
+                    app:trackColorInactive="@color/hairline_stroke" />
 
-                <!-- Text Size -->
-                <TextView
-                    android:id="@+id/tv_text_size_label"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Cỡ chữ bản dịch: 14sp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
-
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/slider_text_size"
+                <!-- Slider 2: Text size -->
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Cỡ chữ bản dịch"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvTextSizeValue"
+                        style="@style/AtlasTabularValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="14 sp" />
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderTextSize"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/slider_text_size_cd"
+                    android:stepSize="1"
                     android:value="14"
                     android:valueFrom="10"
                     android:valueTo="24"
-                    android:stepSize="1" />
+                    app:labelBehavior="gone"
+                    app:thumbColor="@color/ink_primary"
+                    app:trackColorActive="@color/ink_primary"
+                    app:trackColorInactive="@color/hairline_stroke" />
 
+                <!-- Slider 3: Auto clear -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="Tự động ẩn thẻ sau"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/tvAutoClearValue"
+                        style="@style/AtlasTabularValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tắt" />
+                </LinearLayout>
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/sliderAutoClear"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="@string/slider_auto_clear_cd"
+                    android:stepSize="5"
+                    android:value="0"
+                    android:valueFrom="0"
+                    android:valueTo="30"
+                    app:labelBehavior="gone"
+                    app:thumbColor="@color/ink_primary"
+                    app:trackColorActive="@color/ink_primary"
+                    app:trackColorInactive="@color/hairline_stroke" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

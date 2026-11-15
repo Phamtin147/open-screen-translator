@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="atlas_horizontal_margin">16dp</dimen>
+    <dimen name="atlas_preview_height">196dp</dimen>
+</resources>

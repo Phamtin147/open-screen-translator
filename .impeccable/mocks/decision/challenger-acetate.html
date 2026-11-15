@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Acetate Proof Tab Board</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 390px; height: 844px; overflow: hidden;
+    font-family: system-ui, -apple-system, Roboto, sans-serif;
+    background: #F5F3EE; color: #18181B;
+    display: flex; flex-direction: column; padding: 20px 16px; gap: 14px;
+  }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  h1 { font-size: 19px; font-weight: 800; }
+  .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; background: #E7E4DC; padding: 4px; border-radius: 12px; }
+  .tab { text-align: center; padding: 9px 6px; font-size: 12px; font-weight: 700; border-radius: 9px; color: #52525B; }
+  .tab.on { background: #18181B; color: #FFFFFF; }
+  .acetate {
+    background: rgba(255,255,255,0.78); border: 1.5px solid #0EA5E9;
+    border-radius: 16px; padding: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+  }
+  .cta { width: 100%; height: 50px; border: 0; border-radius: 12px; background: #0EA5E9; color: #FFFFFF; font-size: 15px; font-weight: 700; margin-top: 12px; }
+  .panel { background: #FFFFFF; border: 1px solid #E4E4E7; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .pill-row { display: flex; gap: 8px; }
+  .pill { flex: 1; padding: 10px; border-radius: 10px; background: #F4F4F5; font-size: 13px; font-weight: 600; text-align: center; }
+  .pill.sel { background: #FEF3C7; color: #92400E; border: 1px solid #F59E0B; }
+</style>
+</head>
+<body>
+  <div class="top"><h1>Open Screen Translator</h1><span style="font-size:12px;font-weight:700;color:#0EA5E9">v1.1</span></div>
+  <div class="tabs">
+    <div class="tab on">Dịch nhanh</div>
+    <div class="tab">Model AI</div>
+    <div class="tab">Hiển thị</div>
+  </div>
+  <div class="acetate">
+    <div style="font-size:12px;font-weight:700;color:#0284C7">Lớp phủ dịch trực tiếp</div>
+    <div style="font-size:18px;font-weight:700;margin-top:4px">Nhật (JA) → Việt (VI)</div>
+    <div style="font-size:13px;color:#52525B;margin-top:4px">Đang dùng: Hy-MT2-1.8B · Chế độ Manga R→L</div>
+    <button class="cta">Bật bong bóng dịch</button>
+  </div>
+  <div class="panel">
+    <div style="font-size:13px;font-weight:700">Chiều đọc truyện tranh</div>
+    <div class="pill-row">
+      <div class="pill sel">Manga Nhật (R → L)</div>
+      <div class="pill">Webtoon (L → R)</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div style="font-size:13px;font-weight:700">Thẻ xem trước lớp phủ (90% mờ)</div>
+    <div style="background:#18181B;padding:14px;border-radius:10px">
+      <div style="background:rgba(24,24,27,0.9);border:1px solid #0EA5E9;color:#FFF;padding:10px;border-radius:8px;font-size:13px">
+        Đừng lại gần! Nguy hiểm lắm!
+      </div>
+    </div>
+  </div>
+</body>
+</html>

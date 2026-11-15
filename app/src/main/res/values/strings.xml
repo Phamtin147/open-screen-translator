@@ -1,11 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Open Screen Translator</string>
+    <string name="app_subtitle">Dịch màn hình &amp; truyện tranh</string>
+
     <string name="service_notification_title">Open Screen Translator đang chạy</string>
-    <string name="service_notification_desc">Chạm vào bong bóng trên màn hình để dịch tức thì.</string>
+    <string name="service_notification_desc">Chạm nút nổi trên màn hình để dịch tức thì</string>
     <string name="stop_service">Dừng dịch</string>
-    <string name="start_service">Khởi động bong bóng dịch</string>
-    <string name="source_language">Ngôn ngữ nguồn</string>
-    <string name="target_language">Ngôn ngữ đích</string>
-    <string name="overlay_opacity">Độ mờ của bong bóng</string>
-    <string name="grant_permission">Cấp quyền hiển thị trên ứng dụng khác</string>
+    <string name="start_service">Bật dịch màn hình</string>
+    <string name="permission_overlay_needed">Cần cấp quyền Hiển thị trên ứng dụng khác</string>
+    <string name="grant_overlay_btn">Cấp quyền nổi</string>
+
+    <string name="bubble_cd">Chạm để dịch màn hình hoặc ẩn thẻ dịch</string>
+    <string name="swap_languages_cd">Đảo ngôn ngữ nguồn và đích</string>
+    <string name="theme_toggle_cd">Đổi giao diện Sáng / Tối / Hệ thống</string>
+
+    <string name="theme_system">Tự động</string>
+    <string name="theme_light">Ban ngày</string>
+    <string name="theme_dark">Ban đêm</string>
+
+    <string name="slider_opacity_cd">Độ mờ nền thẻ dịch</string>
+    <string name="slider_text_size_cd">Cỡ chữ bản dịch</string>
+    <string name="slider_auto_clear_cd">Thời gian tự động ẩn thẻ dịch</string>
 </resources>

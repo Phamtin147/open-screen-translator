@@ -1,0 +1,417 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-15T10:39:12Z",
+  "title": "Design System: Open Screen Translator",
+  "extensions": {
+    "colorMeta": {
+      "vermilion-signal": {
+        "role": "primary",
+        "displayName": "Vermilion Signal (Day)",
+        "canonical": "oklch(56.7% 0.179 36.4)",
+        "tonalRamp": ["#200300", "#490e00", "#781e00", "#aa2e00", "#d6532e", "#f68262", "#ffbba8", "#ffe9e3"]
+      },
+      "vermilion-ink": {
+        "role": "primary",
+        "displayName": "Vermilion Ink (Day)",
+        "canonical": "oklch(51.3% 0.167 35.6)",
+        "tonalRamp": ["#200200", "#4a0d00", "#791c00", "#a8300c", "#d25737", "#f28569", "#ffbba9", "#ffe9e3"]
+      },
+      "vermilion-blush": {
+        "role": "primary",
+        "displayName": "Vermilion Blush Container (Day)",
+        "canonical": "oklch(93.7% 0.021 43.9)",
+        "tonalRamp": ["#110c0a", "#2d2421", "#4b403b", "#6b5d57", "#8e807a", "#b2a49f", "#d6cbc7", "#f4ede9"]
+      },
+      "vellum-ground": {
+        "role": "neutral",
+        "displayName": "Astronomical Vellum Ground (Day)",
+        "canonical": "oklch(96.7% 0.012 91.5)",
+        "tonalRamp": ["#0e0d0a", "#282622", "#44423c", "#636059", "#86837b", "#aaa8a1", "#cfcec8", "#f0eeea"]
+      },
+      "vellum-card": {
+        "role": "neutral",
+        "displayName": "Chart Card Paper (Day)",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": ["#0d0d0d", "#262626", "#424242", "#606060", "#838383", "#a8a8a8", "#cecece", "#eeeeee"]
+      },
+      "vellum-recessed": {
+        "role": "neutral",
+        "displayName": "Recessed Vellum Plate (Day)",
+        "canonical": "oklch(94.3% 0.014 93.0)",
+        "tonalRamp": ["#0e0d0a", "#282621", "#44423b", "#636058", "#86837a", "#aaa8a0", "#d0cec7", "#f0eeea"]
+      },
+      "hairline-vellum": {
+        "role": "neutral",
+        "displayName": "Vellum Hairline Rule (Day)",
+        "canonical": "oklch(85.3% 0.023 87.2)",
+        "tonalRamp": ["#0f0d08", "#2a261e", "#474237", "#666052", "#898374", "#ada79a", "#d2cdc3", "#f1eee7"]
+      },
+      "hairline-bronze": {
+        "role": "neutral",
+        "displayName": "Strong Bronze Rule (Day)",
+        "canonical": "oklch(73.5% 0.033 84.6)",
+        "tonalRamp": ["#100d06", "#2c261a", "#494131", "#695f4c", "#8c826e", "#b0a794", "#d4cdbe", "#f3eee3"]
+      },
+      "prussian-ink": {
+        "role": "neutral",
+        "displayName": "Prussian Ink (Day)",
+        "canonical": "oklch(21.3% 0.040 258.3)",
+        "tonalRamp": ["#080d15", "#1e2734", "#374355", "#536177", "#75849b", "#9ba9bd", "#c4cfdf", "#e7effb"]
+      },
+      "prussian-slate": {
+        "role": "neutral",
+        "displayName": "Prussian Slate (Day)",
+        "canonical": "oklch(41.3% 0.043 258.8)",
+        "tonalRamp": ["#080d16", "#1e2735", "#374356", "#526179", "#74849d", "#9aa9bf", "#c3cfe0", "#e7effc"]
+      },
+      "bronze-umber": {
+        "role": "secondary",
+        "displayName": "Bronze Umber Muted (Day)",
+        "canonical": "oklch(46.2% 0.038 83.4)",
+        "tonalRamp": ["#110d05", "#2d2518", "#4b412e", "#6b5f48", "#8e826a", "#b1a691", "#d6cdbc", "#f4eee2"]
+      },
+      "on-vermilion": {
+        "role": "primary",
+        "displayName": "On Vermilion White",
+        "canonical": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": ["#0d0d0d", "#262626", "#424242", "#606060", "#838383", "#a8a8a8", "#cecece", "#eeeeee"]
+      },
+      "observatory-emerald": {
+        "role": "secondary",
+        "displayName": "Observatory Emerald Active (Day)",
+        "canonical": "oklch(45.6% 0.113 150.9)",
+        "tonalRamp": ["#001204", "#003012", "#0b5026", "#26713e", "#4c9660", "#7bb989", "#acdcb6", "#d7f9dd"]
+      },
+      "amber-ochre": {
+        "role": "secondary",
+        "displayName": "Amber Ochre Warning (Day)",
+        "canonical": "oklch(47.6% 0.103 61.9)",
+        "tonalRamp": ["#190900", "#3c1e00", "#633600", "#885219", "#ae753f", "#cf9c6f", "#eec5a1", "#ffead9"]
+      },
+      "amber-parchment": {
+        "role": "secondary",
+        "displayName": "Amber Warning Strip Fill (Day)",
+        "canonical": "oklch(96.2% 0.058 95.6)",
+        "tonalRamp": ["#110d02", "#2c260e", "#4a4223", "#6a603b", "#8d835c", "#b1a886", "#d5ceb3", "#f4efdb"]
+      },
+      "crimson-stop": {
+        "role": "secondary",
+        "displayName": "Crimson Danger Text & Outline (Day)",
+        "canonical": "oklch(50.5% 0.190 27.5)",
+        "tonalRamp": ["#230000", "#500002", "#810007", "#b11b1b", "#dc4940", "#fc7b6e", "#ffbab1", "#ffe9e5"]
+      },
+      "crimson-fill": {
+        "role": "secondary",
+        "displayName": "Crimson Stop CTA Fill (Day & Night)",
+        "canonical": "oklch(50.5% 0.190 27.5)",
+        "tonalRamp": ["#230000", "#500002", "#810007", "#b11b1b", "#dc4940", "#fc7b6e", "#ffbab1", "#ffe9e5"]
+      },
+      "overlay-vellum": {
+        "role": "neutral",
+        "displayName": "Optical Card Vellum (Day)",
+        "canonical": "oklch(97.6% 0.011 89.7)",
+        "tonalRamp": ["#0e0d0b", "#282622", "#44423d", "#63605a", "#86837c", "#aaa7a1", "#cfcec9", "#f0eeeb"]
+      },
+      "vermilion-signal-night": {
+        "role": "primary",
+        "displayName": "Vermilion Signal (Night)",
+        "canonical": "oklch(56.2% 0.182 35.8)",
+        "tonalRamp": ["#200200", "#4a0d00", "#781c00", "#ab2c00", "#d8512d", "#f78161", "#ffbba8", "#ffe9e3"]
+      },
+      "vermilion-coral-night": {
+        "role": "primary",
+        "displayName": "Vermilion Coral Text (Night)",
+        "canonical": "oklch(68.4% 0.170 38.3)",
+        "tonalRamp": ["#1f0300", "#481100", "#762100", "#a73300", "#d2582f", "#f28563", "#ffbba6", "#ffe9e2"]
+      },
+      "vermilion-ember-night": {
+        "role": "primary",
+        "displayName": "Vermilion Ember Container (Night)",
+        "canonical": "oklch(23.8% 0.034 16.9)",
+        "tonalRamp": ["#140a0b", "#312222", "#513c3d", "#72595a", "#967c7c", "#b9a1a1", "#dcc8c9", "#f9ebeb"]
+      },
+      "observatory-navy-ground": {
+        "role": "neutral",
+        "displayName": "Observatory Navy Ground (Night)",
+        "canonical": "oklch(17.8% 0.036 261.0)",
+        "tonalRamp": ["#090d15", "#202733", "#394353", "#556175", "#788499", "#9da8bb", "#c5cedd", "#e8effa"]
+      },
+      "observatory-navy-card": {
+        "role": "neutral",
+        "displayName": "Observatory Navy Card (Night)",
+        "canonical": "oklch(21.8% 0.043 260.1)",
+        "tonalRamp": ["#080d16", "#1e2735", "#374356", "#536179", "#75849d", "#9ba9bf", "#c3cee1", "#e7effc"]
+      },
+      "observatory-navy-recessed": {
+        "role": "neutral",
+        "displayName": "Recessed Observatory Slate (Night)",
+        "canonical": "oklch(25.3% 0.052 260.1)",
+        "tonalRamp": ["#070d18", "#1c2738", "#35435a", "#50617d", "#7284a2", "#98a9c4", "#c1cfe4", "#e5efff"]
+      },
+      "hairline-orbital-night": {
+        "role": "neutral",
+        "displayName": "Orbital Hairline Rule (Night)",
+        "canonical": "oklch(31.7% 0.063 259.4)",
+        "tonalRamp": ["#060d1a", "#1a273b", "#31435f", "#4c6183", "#6d84a8", "#94a9c9", "#becfe9", "#e5efff"]
+      },
+      "hairline-steel-night": {
+        "role": "neutral",
+        "displayName": "Strong Orbital Frame (Night)",
+        "canonical": "oklch(44.1% 0.077 259.7)",
+        "tonalRamp": ["#050d1d", "#172640", "#2d4365", "#47618b", "#6984b0", "#90a9d0", "#bbcfef", "#e5efff"]
+      },
+      "starlight-ink-night": {
+        "role": "neutral",
+        "displayName": "Starlight Body Ink (Night)",
+        "canonical": "oklch(97.5% 0.006 255.5)",
+        "tonalRamp": ["#0c0d0f", "#252728", "#404245", "#5e6164", "#818387", "#a5a8ab", "#ccced0", "#edeef0"]
+      },
+      "champagne-heading-night": {
+        "role": "neutral",
+        "displayName": "Champagne Display Heading (Night)",
+        "canonical": "oklch(88.7% 0.029 86.6)",
+        "tonalRamp": ["#100d07", "#2b261c", "#484234", "#67604f", "#8a8271", "#aea797", "#d3cdc0", "#f2eee5"]
+      },
+      "starlight-slate-night": {
+        "role": "neutral",
+        "displayName": "Starlight Slate Secondary (Night)",
+        "canonical": "oklch(76.9% 0.037 258.9)",
+        "tonalRamp": ["#090d15", "#1f2733", "#384353", "#546175", "#768499", "#9ca9bc", "#c5cfde", "#e8effa"]
+      },
+      "champagne-muted-night": {
+        "role": "secondary",
+        "displayName": "Champagne Muted & Overlay Stroke (Night)",
+        "canonical": "oklch(83.6% 0.046 82.6)",
+        "tonalRamp": ["#120c04", "#2e2514", "#4d412a", "#6d5e43", "#908165", "#b4a68d", "#d7ccb8", "#f5eedf"]
+      },
+      "phosphor-mint-night": {
+        "role": "secondary",
+        "displayName": "Phosphor Mint Active (Night)",
+        "canonical": "oklch(77.3% 0.153 163.2)",
+        "tonalRamp": ["#001209", "#002f1e", "#005036", "#00734f", "#009b6c", "#4ac191", "#8fe3bb", "#c4fee1"]
+      },
+      "solar-amber-night": {
+        "role": "secondary",
+        "displayName": "Solar Amber Warning (Night)",
+        "canonical": "oklch(83.7% 0.164 84.4)",
+        "tonalRamp": ["#140c00", "#332400", "#563e00", "#7b5b00", "#a67c00", "#d09f2a", "#eec87a", "#ffecc8"]
+      },
+      "amber-umber-night": {
+        "role": "secondary",
+        "displayName": "Amber Warning Surface (Night)",
+        "canonical": "oklch(25.8% 0.039 85.8)",
+        "tonalRamp": ["#110d05", "#2c2617", "#4a412e", "#6a5f48", "#8d8269", "#b1a791", "#d5cdbb", "#f4eee1"]
+      },
+      "coral-danger-night": {
+        "role": "secondary",
+        "displayName": "Coral Danger Outline & Text (Night)",
+        "canonical": "oklch(71.1% 0.166 22.2)",
+        "tonalRamp": ["#230002", "#4f000b", "#7d101c", "#a92c34", "#d25355", "#f2827f", "#ffb9b6", "#ffe8e7"]
+      },
+      "overlay-navy-night": {
+        "role": "neutral",
+        "displayName": "Optical Navy Overlay & Idle Bubble (Night)",
+        "canonical": "oklch(18.9% 0.042 262.1)",
+        "tonalRamp": ["#090d16", "#1f2734", "#384356", "#546178", "#76849c", "#9ca8be", "#c4cee0", "#e8effc"]
+      },
+      "launcher-navy-ground": {
+        "role": "neutral",
+        "displayName": "Adaptive Icon Navy Background",
+        "canonical": "oklch(20.0% 0.043 257.8)",
+        "tonalRamp": ["#080e16", "#1e2735", "#364356", "#526178", "#74849c", "#9aa9bf", "#c3cfe0", "#e7effc"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Atlas App Title",
+        "purpose": "Top app header title in bold Android system serif (20sp)."
+      },
+      "headline": {
+        "displayName": "Atlas Section Heading",
+        "purpose": "Card headings (15sp) and Command Card status headline (17sp) in bold system serif with -0.01 tracking."
+      },
+      "title": {
+        "displayName": "Control & Option Title",
+        "purpose": "Engine row names, comic mode switch rows (14sp bold Roboto), and primary service CTA (15sp)."
+      },
+      "body": {
+        "displayName": "Telemetry & Overlay Body",
+        "purpose": "13sp system Roboto with tnum tabular figures for control deck telemetry, plus 10sp-24sp calibrated floating translation text."
+      },
+      "label": {
+        "displayName": "Tabular Tag & Variant Label",
+        "purpose": "11sp bold tnum status badges and GGUF quant labels; 12sp secondary subtitles and direction toggles."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flat-atlas-0dp",
+        "value": "none",
+        "purpose": "All MaterialCardView surfaces keep cardElevation at 0dp; hierarchy uses tonal stepping and 1dp hairline strokes."
+      }
+    ],
+    "motion": [
+      {
+        "name": "preview-invalidate",
+        "value": "synchronous invalidate() on slider/toggle events",
+        "purpose": "Redraws ComicPreviewView reading order, opacity, and sp text size without onDraw allocations."
+      },
+      {
+        "name": "progress-compat",
+        "value": "LinearProgressIndicator.setProgressCompat(pct, true)",
+        "purpose": "Smooth Material 3 determinate progress animation during Hugging Face GGUF downloads."
+      },
+      {
+        "name": "bubble-loading-state",
+        "value": "alpha 1.0 -> 0.96 + instant drawable swap",
+        "purpose": "Indicates active screen capture/translation on the floating reticle without delaying dismissal."
+      },
+      {
+        "name": "overlay-auto-clear",
+        "value": "Handler.postDelayed(0..30s step 5s)",
+        "purpose": "Optional user-calibrated timer removing floating translation cards automatically."
+      }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "<600dp (16dp margin, 196dp preview)" },
+      { "name": "w600dp", "value": "600dp (64dp margin, 212dp preview)" },
+      { "name": "w840dp", "value": "840dp (140dp margin, 212dp preview)" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Start Service CTA",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Full-width 52dp signal-vermilion action button that starts MediaProjection and the floating reticle.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M8,1L9.6,6.4L15,8L9.6,9.6L8,15L6.4,9.6L1,8L6.4,6.4Z\"/></svg><span>Bật dịch màn hình</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 0 20px; border: none; border-radius: 12px; background: #c94218; color: #ffffff; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: filter 140ms ease, transform 120ms ease; } .ds-btn-primary:hover { filter: brightness(0.92); } .ds-btn-primary:focus-visible { outline: 2px solid #0d192b; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.99); }"
+    },
+    {
+      "name": "Running Stop Service CTA",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Active-service CTA using shared status_danger_fill (#B91C1C) to keep >=6.4:1 contrast with white text in Day and Night.",
+      "html": "<button class=\"ds-btn-danger\">Dừng dịch màn hình</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 52px; padding: 0 20px; border: none; border-radius: 12px; background: #b91c1c; color: #ffffff; font-family: Roboto, sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: filter 140ms ease, transform 120ms ease; } .ds-btn-danger:hover { filter: brightness(0.92); } .ds-btn-danger:focus-visible { outline: 2px solid #0d192b; outline-offset: 2px; } .ds-btn-danger:active { transform: scale(0.99); }"
+    },
+    {
+      "name": "Theme Mode Outlined Button",
+      "kind": "button",
+      "refersTo": "button-outlined",
+      "description": "48dp top-bar cycler toggling Tự động, Ban ngày, and Ban đêm themes.",
+      "html": "<button class=\"ds-btn-outlined\" type=\"button\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12,3V5M12,19V21M4.22,5.64L5.64,7.05M18.36,18.36L19.78,19.78M3,12H5M19,12H21M5.64,18.36L7.05,16.95M18.36,7.05L19.78,5.64M12,8A4,4 0 1,1 8,12A4,4 0 0,1 12,8Z\"/></svg><span>Tự động</span></button>",
+      "css": ".ds-btn-outlined { display: inline-flex; align-items: center; gap: 6px; min-height: 48px; padding: 0 12px; border: 1px solid #b3a892; border-radius: 10px; background: #ffffff; color: #0d192b; font-family: Roboto, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 140ms ease; } .ds-btn-outlined:hover { background: #efece2; } .ds-btn-outlined:focus-visible { outline: 2px solid #c94218; outline-offset: 2px; } .ds-btn-outlined:active { background: #e6e1d3; }"
+    },
+    {
+      "name": "Atlas Chart Card",
+      "kind": "card",
+      "refersTo": "card-atlas",
+      "description": "Flat 0dp MaterialCardView container with 1dp hairline border and bold serif section header.",
+      "html": "<section class=\"ds-card-atlas\"><div class=\"ds-card-head\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path fill=\"#c94218\" d=\"M8,1L9.6,6.4L15,8L9.6,9.6L8,15L6.4,9.6L1,8L6.4,6.4Z\"/></svg><h3 class=\"ds-card-title\">Sẵn sàng dịch trên mọi ứng dụng</h3><span class=\"ds-status-pill\"><i class=\"ds-status-dot\"></i>TẠM DỪNG</span></div><p class=\"ds-card-summary\">EN → VI · Google ML Kit · Manga R→L</p></section>",
+      "css": ".ds-card-atlas { background: #ffffff; border: 1px solid #d5cebe; border-radius: 14px; padding: 16px; color: #0d192b; font-family: Roboto, sans-serif; } .ds-card-head { display: flex; align-items: center; gap: 8px; } .ds-card-title { margin: 0; flex: 1; font-family: Georgia, serif; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: #0d192b; } .ds-status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #635740; } .ds-status-dot { width: 9px; height: 9px; border-radius: 50%; background: #635740; display: inline-block; } .ds-card-summary { margin: 6px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; color: #3d4c63; }"
+    },
+    {
+      "name": "Selectable Engine Row",
+      "kind": "chip",
+      "refersTo": "option-row-selected",
+      "description": "54dp min-height translation engine selector toggling between recessed 1dp border and vermilion-soft 1.5dp border.",
+      "html": "<div class=\"ds-engine-stack\"><button type=\"button\" class=\"ds-option-row ds-option-selected\"><span class=\"ds-option-copy\"><strong>Hy-MT2-1.8B AI (GGUF)</strong><small>Model dịch truyện &amp; hội thoại offline qua llama.cpp</small></span><span class=\"ds-option-tag ds-tag-ready\">SẴN SÀNG</span></button><button type=\"button\" class=\"ds-option-row\"><span class=\"ds-option-copy\"><strong>Google ML Kit Offline</strong><small>Nhẹ (~30 MB), tự động fallback Cloud nếu lỗi</small></span><span class=\"ds-option-tag\">OFFLINE NHẸ</span></button></div>",
+      "css": ".ds-engine-stack { display: flex; flex-direction: column; gap: 8px; } .ds-option-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 54px; padding: 10px 12px; border: 1px solid #d5cebe; border-radius: 10px; background: #efece2; color: #0d192b; text-align: left; font-family: Roboto, sans-serif; cursor: pointer; transition: border-color 120ms ease, background 120ms ease; } .ds-option-row:hover { border-color: #b3a892; } .ds-option-row:focus-visible { outline: 2px solid #c94218; outline-offset: 2px; } .ds-option-selected { background: #f7e6df; border: 1.5px solid #c94218; } .ds-option-copy { display: flex; flex-direction: column; gap: 2px; } .ds-option-copy strong { font-size: 14px; font-weight: 700; } .ds-option-copy small { font-size: 12px; color: #3d4c63; } .ds-option-tag { font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #635740; white-space: nowrap; } .ds-tag-ready { color: #156834; }"
+    },
+    {
+      "name": "Outlined Language Selector",
+      "kind": "input",
+      "refersTo": "input-outlined",
+      "description": "48dp recessed exposed dropdown paired with a 48dp borderless horizontal language swap control.",
+      "html": "<div class=\"ds-lang-pair\"><label class=\"ds-input-box\"><span class=\"ds-input-label\">Ngôn ngữ gốc</span><select class=\"ds-select\"><option>Tiếng Nhật (JA)</option><option>Tiếng Anh (EN)</option></select></label><button type=\"button\" class=\"ds-swap-btn\" aria-label=\"Swap languages\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M7,8H19M19,8L15.5,4.5M19,8L15.5,11.5M17,16H5M5,16L8.5,12.5M5,16L8.5,19.5\"/></svg></button></div>",
+      "css": ".ds-lang-pair { display: flex; align-items: center; gap: 8px; font-family: Roboto, sans-serif; } .ds-input-box { position: relative; flex: 1; display: flex; align-items: center; min-height: 48px; background: #efece2; border: 1px solid #b3a892; border-radius: 10px; padding: 0 12px; } .ds-input-box:focus-within { border-color: #c94218; border-width: 1.5px; } .ds-input-label { position: absolute; top: -8px; left: 10px; padding: 0 4px; background: #ffffff; font-size: 11px; color: #3d4c63; } .ds-select { width: 100%; border: none; background: transparent; color: #0d192b; font-size: 13px; outline: none; min-height: 44px; } .ds-swap-btn { width: 48px; height: 48px; border: none; border-radius: 50%; background: transparent; color: #0d192b; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; } .ds-swap-btn:hover { background: #efece2; } .ds-swap-btn:focus-visible { outline: 2px solid #c94218; }"
+    },
+    {
+      "name": "ComicPreviewView Calibration Plate",
+      "kind": "custom",
+      "refersTo": "preview-plate",
+      "description": "Signature 3-panel schematic illustrating RTL/LTR reading order and live overlay opacity + sp size calibration.",
+      "html": "<div class=\"ds-preview-plate\"><div class=\"ds-preview-grid\"><div class=\"ds-panel ds-panel-left\"><div class=\"ds-bubble-slot\"><span class=\"ds-order-pill\">03</span><span class=\"ds-hint\">Giữ đúng đại từ</span></div></div><div class=\"ds-panel-stack\"><div class=\"ds-panel ds-panel-top\"><div class=\"ds-live-sample\"><span class=\"ds-order-pill ds-order-active\">01</span><p>Đợi đã! Câu này được gộp liền mạch.</p></div></div><div class=\"ds-panel ds-panel-bot\"><div class=\"ds-bubble-slot\"><span class=\"ds-order-pill\">02</span><span class=\"ds-hint\">Thoại theo ngữ cảnh</span></div></div></div></div></div>",
+      "css": ".ds-preview-plate { background: #efece2; border: 1px solid #b3a892; border-radius: 12px; padding: 8px; height: 196px; font-family: Roboto, sans-serif; } .ds-preview-grid { display: grid; grid-template-columns: 48% 1fr; gap: 7px; height: 100%; } .ds-panel-stack { display: grid; grid-template-rows: 1fr 1fr; gap: 7px; } .ds-panel { border: 1.2px solid #b3a892; border-radius: 8px; padding: 8px; display: flex; align-items: center; justify-content: center; position: relative; } .ds-bubble-slot { width: 100%; height: 100%; border: 1px dashed rgba(99,87,64,0.51); border-radius: 10px; background: rgba(255,255,255,0.84); display: flex; align-items: center; justify-content: center; position: relative; padding: 6px; } .ds-live-sample { width: 100%; height: 100%; border: 1.1px solid #0d192b; border-radius: 8px; background: rgba(250,247,239,0.92); color: #0d192b; display: flex; align-items: center; justify-content: center; text-align: center; padding: 12px 6px 6px; position: relative; } .ds-live-sample p { margin: 0; font-size: 14px; line-height: 1.2; } .ds-hint { font-size: 11px; font-weight: 700; color: rgba(99,87,64,0.82); text-align: center; } .ds-order-pill { position: absolute; top: -6px; left: 5px; width: 24px; height: 16px; border-radius: 4px; background: #efece2; border: 1.2px solid #b3a892; color: #0d192b; font-family: monospace; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; } .ds-order-active { background: #c94218; border-color: #c94218; color: #ffffff; }"
+    },
+    {
+      "name": "Floating Crosshair Bubble",
+      "kind": "custom",
+      "refersTo": "floating-bubble",
+      "description": "52dp fixed-dark optical reticle floating above games and manga; swaps to vermilion when capturing.",
+      "html": "<div class=\"ds-bubble-pair\"><button type=\"button\" class=\"ds-bubble\" aria-label=\"Idle floating translator\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"#faf7f0\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4,6.5C4,5.4 4.9,4.5 6,4.5H15C16.1,4.5 17,5.4 17,6.5V12.5C17,13.6 16.1,14.5 15,14.5H9L5.5,17.5V14.5H6C4.9,14.5 4,13.6 4,12.5V6.5Z\"/><path fill=\"#e85427\" d=\"M18.5,10.5L19.5,13.2L22.2,14.2L19.5,15.2L18.5,18L17.5,15.2L14.8,14.2L17.5,13.2Z\"/></svg></button><button type=\"button\" class=\"ds-bubble ds-bubble-active\" aria-label=\"Capturing translation\"><svg width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4,6.5C4,5.4 4.9,4.5 6,4.5H15C16.1,4.5 17,5.4 17,6.5V12.5C17,13.6 16.1,14.5 15,14.5H9L5.5,17.5V14.5H6C4.9,14.5 4,13.6 4,12.5V6.5Z\"/><path fill=\"#ffffff\" d=\"M18.5,10.5L19.5,13.2L22.2,14.2L19.5,15.2L18.5,18L17.5,15.2L14.8,14.2L17.5,13.2Z\"/></svg></button></div>",
+      "css": ".ds-bubble-pair { display: inline-flex; gap: 12px; align-items: center; } .ds-bubble { width: 52px; height: 52px; padding: 13px; border-radius: 50%; background: #091326; border: 1.5px solid #d8c7a8; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 120ms ease, opacity 120ms ease; } .ds-bubble:hover { transform: scale(1.04); } .ds-bubble:focus-visible { outline: 2px solid #c94218; outline-offset: 2px; } .ds-bubble-active { background: #c94218; border-color: #faf7f0; opacity: 0.96; }"
+    },
+    {
+      "name": "Optical Translation Overlay Card",
+      "kind": "custom",
+      "refersTo": "overlay-card",
+      "description": "Calibrated speech-bubble replacement card with 1dp border, tnum [01] prefix, and tap-to-clear dismissal.",
+      "html": "<button type=\"button\" class=\"ds-overlay-card\"><span class=\"ds-overlay-idx\">[01] </span>Đợi đã! Câu này được gộp liền mạch.</button>",
+      "css": ".ds-overlay-card { background: rgba(250,247,239,0.92); color: #0d192b; border: 1px solid #0d192b; border-radius: 10px; padding: 6px 9px; font-family: Roboto, sans-serif; font-size: 14px; line-height: 1.22; font-variant-numeric: tabular-nums; text-align: center; cursor: pointer; transition: opacity 120ms ease; } .ds-overlay-card:hover { opacity: 1; } .ds-overlay-card:focus-visible { outline: 2px solid #c94218; outline-offset: 2px; } .ds-overlay-idx { color: #b23510; font-weight: 700; font-size: 0.84em; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Celestial Star Atlas",
+    "overview": "Open Screen Translator treats mobile screen translation and manga bubble reconstruction as an optical instrument rather than a generic dark utility panel. Across both its Material 3 control deck and its system-level floating overlays, surfaces behave like precision astronomical plates: flat, hairline-ruled charts with crisp figure-ground contrast, tabular telemetry readouts, and one reserved signal vermilion channel for live capture and active selection.\n\nThe system operates natively in two equal registers tuned to real comic and game reading environments: **Daytime Astronomical Vellum** (`values/colors.xml`) for daylight clarity on warm paper grounds, and **Nighttime Observatory Navy** (`values-night/colors.xml`) for low-glare reading in dark rooms. Motion stays deliberately functional and synchronous—slider drags and reading-direction switches redraw `ComicPreviewView` immediately via `invalidate()`, Material ripples provide native touch feedback, `LinearProgressIndicator` animates determinate GGUF download progress, and the floating crosshair bubble uses a `10dp` drag threshold, immediate loading-state color inversion (`alpha = 0.96f`), and user-calibrated auto-clear timers without decorative screen transitions.\n\nThe system explicitly rejects stock dark-glass blur gradients, centered neon-purple pill stacks, drop-shadowed cards, and concealed model or fallback status.",
+    "keyCharacteristics": [
+      "Dual first-class Day (`#F7F4EB` vellum) and Night (`#081121` observatory navy) Material 3 XML registers synchronized across both `MainActivity` and `OverlayManager`.",
+      "Flat `0dp`-elevation outlined chart cards separated strictly by tonal surface steps (`surface_ground` -> `surface_card` -> `surface_recessed`) and `1dp` hairline rules.",
+      "Reserved signal vermilion (`#C94218` Day / `#C93E14` Night) restricted to the primary start-service CTA, active selections, star reticle, and download progress.",
+      "Tabular-numeral telemetry (`fontFeatureSettings=\"tnum\"`) across model sizes, download speeds, and overlay calibration readouts.",
+      "Always-legible optical overlay reticle (`#091326` navy disc with `#D8C7A8` champagne rim) engineered to hold contrast over bright comic pages and dark game HUDs alike."
+    ],
+    "rules": [
+      {
+        "name": "The Single Vermilion Signal Rule",
+        "body": "Never spend `accent_vermilion` (`#C94218` Day / `#C93E14` Night) on decorative borders, passive icons, or inactive chrome; reserve it exclusively for the primary service trigger, currently active selections, download progress, and the active reticle state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dual-Register Parity Rule",
+        "body": "Every surface, hairline, and status role in `values/colors.xml` must maintain a calibrated counterpart in `values-night/colors.xml`, and `OverlayManager` must resolve its `Configuration.uiMode` from `prefs.themeMode` so floating translation cards never invert awkwardly against the user's chosen register.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Telemetry Rule",
+        "body": "Apply `fontFeatureSettings=\"tnum\"` (`@style/AtlasTabularValue`) to every live readout containing numbers, percentages, megabytes, or `sp`/`s` units (`tvStatusBadge`, `tvActiveSummary`, `tvHymtEngineTag`, `tvDownloadProgressStats`, `tvPreviewSpec`, slider readouts, and `OverlayManager` `[01]` indices) so counters never jitter horizontally while updating.",
+        "section": "typography"
+      },
+      {
+        "name": "The Scalable Type Rule",
+        "body": "Define every user-facing text size in `sp`—never fixed `dp` or `px`—inside unconstrained `wrap_content` containers so layouts never clip when Android system font scaling reaches `1.3x`.",
+        "section": "typography"
+      },
+      {
+        "name": "The 16dp Vertical Axis & 48dp Target Rule",
+        "body": "Align primary card edges on the `16dp` horizontal baseline (expanding via `w600dp`/`w840dp` `dimens.xml` rather than multi-column card grids) and guarantee at least a `48dp` touch target height on every actionable view.",
+        "section": "layout"
+      },
+      {
+        "name": "The Zero-Shadow Chart Rule",
+        "body": "Keep `cardElevation` at `0dp` and separate stacked surfaces with tonal contrast and `1dp` hairline borders instead of Material elevation shadows or dark-glass blur.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One-Weight Perimeter Rule",
+        "body": "Default borders stay at `1dp` (`hairline_stroke` or `hairline_strong`) and step up to `1.5dp` only for active selection (`bg_option_selected.xml`) or the floating optical reticle (`bubble_background*.xml`).",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** keep every card at `cardElevation=\"0dp\"` (`AtlasCardStyle`) and express hierarchy through `surface_ground`, `surface_card`, `surface_recessed`, and `1dp` hairline rules.",
+      "**Do** declare every text size in `sp`, enforce `minHeight=\"48dp\"` on all interactive controls, and apply `fontFeatureSettings=\"tnum\"` to numeric telemetry and readouts.",
+      "**Do** resolve `OverlayManager` theme resources through a `Configuration`-adjusted context matching `prefs.themeMode` (`Ban ngày` / `Ban đêm` / `Tự động`) so floating cards mirror the user's chosen Day or Night register.",
+      "**Do** keep `status_danger_fill` (`#B91C1C`) behind white `on_accent` stop-button text in both Day and Night modes while reserving Night `status_danger` (`#F87171`) strictly for dark-surface outlined strokes and text.",
+      "**Do** surface engine readiness, GGUF download progress (`MB`, `MB/s`, `%`), and active reading mode (`R→L` / `L→R`) directly in the Command Card and Engine Deck without hiding fallback or unready states."
+    ],
+    "donts": [
+      "**Don't** introduce dark-glass backdrop blurs, drop shadows, neon glow borders, or purple gradient pills on either `MainActivity` or `OverlayManager` cards.",
+      "**Don't** spend `accent_vermilion` (`#C94218` Day / `#C93E14` Night) on neutral icons, idle cards, or more than one primary service CTA per viewport.",
+      "**Don't** hardcode fixed `px` or `dp` text sizes or clip `TextView` containers that break at `1.3x` system font scale.",
+      "**Don't** allocate `Paint`, `RectF`, or `DashPathEffect` objects inside `ComicPreviewView.onDraw`, which redraws synchronously on every slider tick.",
+      "**Don't** ship raw emoji or text glyphs as UI icons; draw vector drawables in `res/drawable/*.xml` matching the `1.8dp`–`1.9dp` stroke grammar."
+    ]
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "title": "Chọn hướng giao diện cho Open Screen Translator",
+  "question": "Hệ thống đã roll hướng Bilingual Pocket Dictionary & Ruby Gloss (kèm gợi ý Tankōbon Print & 2 phương án cạnh tranh). Bạn chọn hướng nào cho màn hình & thẻ dịch Android?",
+  "options": [
+    {
+      "id": "assigned",
+      "kind": "assigned",
+      "label": "Bilingual Pocket Dictionary & Ruby Gloss",
+      "kicker": "THE ROLL",
+      "lineage": "Từ điển song ngữ Nhật–Việt & bản in chú âm Ruby",
+      "thesis": "Bố cục tra cứu song ngữ sắc nét trên cả nền giấy sáng ban ngày lẫn mực tối ban đêm, giữ duy nhất màu ngọc bích cho trạng thái dịch.",
+      "palette": [
+        "#F7F7F4",
+        "#141619",
+        "#0F766E",
+        "#121316",
+        "#2DD4BF"
+      ],
+      "materials": [
+        "nền giấy từ điển sáng/tối",
+        "đường phân cách 1px",
+        "số liệu tabular"
+      ],
+      "viewport": "Top bar tên app + chuyển nhanh chế độ sáng/tối, thẻ trạng thái nổi + nút chính Bật dịch màn hình, thanh chọn Engine & quản lý file GGUF Hy-MT2, cùng khối Đọc truyện R→L / L→R kèm preview bong bóng.",
+      "risk": "Có thể hơi nghiêm túc như app từ điển nếu thiếu khung xem trước bong bóng truyện trực quan.",
+      "raised": [
+        {
+          "from": "ikeda-datamatics",
+          "raise": "Mọi chỉ số dung lượng model (689 MB / 1.08 GB), tiến trình tải và cỡ chữ dùng số tabular căn thẳng."
+        },
+        {
+          "from": "vernacular-ephemera-boarding-pass-and-gate-board",
+          "raise": "Trạng thái dịch nổi, tải model và fallback hiện cố định ngay đầu màn hình, đổi màu tức thì khi kích hoạt."
+        },
+        {
+          "from": "crouwel-grid-specimen",
+          "raise": "Toàn bộ tiêu đề, ô nhập và thẻ cấu hình bám sát một lề dọc 16dp thống nhất."
+        },
+        {
+          "from": "notation-diagram-systems-star-atlas",
+          "raise": "Chỉ nút hành động chính và engine đang chạy mang màu nhấn; thanh trượt hiệu chỉnh giữ sắc trung tính."
+        }
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html",
+      "htmlFrame": "390x844",
+      "comp": ".impeccable/mocks/decision/assigned.png"
+    },
+    {
+      "id": "model-pick",
+      "kind": "pick",
+      "label": "Tankōbon Print & Vellum Proof",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Bản in truyện Tankōbon & lớp giấy can hiệu đính bản dịch",
+      "thesis": "Cảm hứng từ trang giấy manga washi ấm ban ngày và mực sumi ban đêm, lấy sắc chu sa làm nút kích hoạt dịch nổi.",
+      "palette": [
+        "#FAF8F4",
+        "#16171A",
+        "#C93B2B",
+        "#111214",
+        "#FF6B57"
+      ],
+      "materials": [
+        "giấy washi ấm",
+        "thẻ dịch mờ kiểu giấy can",
+        "mực sumi tương phản cao"
+      ],
+      "viewport": "Đỉnh màn hình có nút Bật dịch chu sa, hàng đảo cặp ngôn ngữ (JA ⇄ VI), thẻ trạng thái model Hy-MT2-1.8B offline và khung preview tương tác thứ tự bong bóng R→L / L→R.",
+      "risk": "Gần gũi nhất với người đọc truyện nhưng cũng là hướng quen thuộc cho app hỗ trợ manga.",
+      "html": ".impeccable/mocks/decision/model-pick.html",
+      "htmlFrame": "390x844",
+      "comp": ".impeccable/mocks/decision/model-pick.png"
+    },
+    {
+      "id": "challenger-console",
+      "kind": "challenger",
+      "catalogId": "digital-design-canon-dark-first-developer-console",
+      "verdict": "competitive",
+      "label": "Graphite Hairline Console",
+      "lineage": "Bề mặt công cụ graphite tối giản với đường chia 1px",
+      "thesis": "Không gian công cụ phẳng phân tầng bằng rãnh 1px và cô lập vùng xóa model/dừng dịch khỏi thao tác chạm thường.",
+      "palette": [
+        "#141518",
+        "#1E2025",
+        "#2B2E36",
+        "#38BDF8",
+        "#EF4444"
+      ],
+      "materials": [
+        "graphite mờ",
+        "đường chia hairline 1px",
+        "nút xóa model cô lập"
+      ],
+      "viewport": "Cụm điều khiển kỹ thuật rõ ràng: trạng thái service, bảng chọn ngôn ngữ/engine, tiến trình tải Hy-MT2 GGUF và nút xóa file tách riêng.",
+      "case": "Rất mạnh về độ rõ ràng khi quản lý model nặng (~1 GB), nhưng thiên về giao diện tối kỹ thuật hơn là chế độ Sáng/Tối cân bằng để đọc truyện.",
+      "risk": "Có thể tạo cảm giác khô cứng như bảng điều khiển dev.",
+      "hero": "https://impeccable.style/worlds/cards/digital-design-canon-dark-first-developer-console-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/digital-design-canon-dark-first-developer-console.webp",
+      "html": ".impeccable/mocks/decision/challenger-console.html",
+      "htmlFrame": "390x844",
+      "comp": ".impeccable/mocks/decision/challenger-console.png"
+    },
+    {
+      "id": "challenger-acetate",
+      "kind": "challenger",
+      "catalogId": "rw-manual-acetate-tab-board",
+      "verdict": "competitive",
+      "label": "Acetate Proof Tab Board",
+      "lineage": "Sổ tay hiệu đính với tấm acetate phủ lên trang nền",
+      "thesis": "Biến màn hình cài đặt thành bảng hiệu đính theo tab, nơi thẻ xem trước nổi như lớp acetate phủ trực tiếp lên trang truyện.",
+      "palette": [
+        "#F5F3EE",
+        "#18181B",
+        "#0EA5E9",
+        "#EAB308",
+        "#E11D48"
+      ],
+      "materials": [
+        "lớp phủ acetate mờ",
+        "tab phân khu rõ",
+        "nền giấy & mực"
+      ],
+      "viewport": "Phân nhóm tab (Dịch nhanh / Offline AI / Hiển thị) giúp màn hình đầu siêu gọn và xem trước thẻ dịch trực tiếp.",
+      "case": "Diễn đạt trúng cơ chế overlay phủ lên truyện, nhưng nhiều tab màu dễ phân tán sự chú ý trên màn hình điện thoại.",
+      "risk": "Nhiều màu phân khu có thể làm rối khi chuyển sang Dark Mode.",
+      "hero": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/rw-manual-acetate-tab-board.webp",
+      "html": ".impeccable/mocks/decision/challenger-acetate.html",
+      "htmlFrame": "390x844",
+      "comp": ".impeccable/mocks/decision/challenger-acetate.png"
+    },
+    {
+      "id": "challenger-ikeda",
+      "kind": "challenger",
+      "catalogId": "ikeda-datamatics",
+      "verdict": "declined",
+      "label": "Data-Sublime Barcode Field",
+      "lineage": "Trường dữ liệu đơn sắc đen-trắng mật độ cao",
+      "thesis": "Chỉ dùng đen và trắng thuần với các cột mã vạch và số tabular dày đặc.",
+      "palette": [
+        "#000000",
+        "#FFFFFF"
+      ],
+      "materials": [
+        "đen trắng thuần",
+        "hình học mã vạch"
+      ],
+      "viewport": "Màn hình chỉ gồm cột số liệu và đường kẻ mã vạch.",
+      "case": "Xung đột với nhu cầu trạng thái màu rõ ràng (đang dịch / đang tải model / lỗi) và đọc êm mắt ban đêm.",
+      "kept": "Số liệu tabular căn thẳng cột cho dung lượng model và tiến trình tải.",
+      "risk": "Gây mỏi mắt và khó nhận biết trạng thái trên điện thoại.",
+      "hero": "https://impeccable.style/worlds/cards/ikeda-datamatics-hero.webp"
+    },
+    {
+      "id": "challenger-boarding",
+      "kind": "challenger",
+      "catalogId": "vernacular-ephemera-boarding-pass-and-gate-board",
+      "verdict": "declined",
+      "label": "Gate Board & Boarding Pass",
+      "lineage": "Bảng thông tin chuyến bay sân bay",
+      "thesis": "Tổ chức thông số dịch thành bảng cửa ra tàu bay đổi màu khi cập nhật.",
+      "palette": [
+        "#18181B",
+        "#F4F4F5",
+        "#F59E0B"
+      ],
+      "materials": [
+        "bảng lật phân ô",
+        "tín hiệu cảnh báo hổ phách"
+      ],
+      "viewport": "Bảng 2 cột xếp hạng engine và cặp ngôn ngữ.",
+      "case": "Ẩn dụ bảng sân bay lệch tông với ngữ cảnh đọc truyện tranh và chơi game.",
+      "kept": "Đánh dấu đổi trạng thái tại chỗ không giật nhảy bố cục.",
+      "risk": "Tạo cảm giác gò bó cho một công cụ đọc giải trí.",
+      "hero": "https://impeccable.style/worlds/cards/vernacular-ephemera-boarding-pass-and-gate-board-hero.webp"
+    },
+    {
+      "id": "challenger-crouwel",
+      "kind": "challenger",
+      "catalogId": "crouwel-grid-specimen",
+      "verdict": "declined",
+      "label": "Crouwel Grid Specimen",
+      "lineage": "Áp phích lưới chữ hình học Wim Crouwel",
+      "thesis": "Hiển thị lưới dựng hình và tiêu đề khổ lớn chiếm nửa màn hình.",
+      "palette": [
+        "#FFFFFF",
+        "#1E40AF",
+        "#93C5FD"
+      ],
+      "materials": [
+        "lưới đồ họa xanh nhạt",
+        "kiểu chữ mô-đun"
+      ],
+      "viewport": "Tiêu đề khổng lồ dựng từ ô lưới ở đầu màn hình.",
+      "case": "Chữ áp phích chiếm hết không gian thao tác trên màn hình điện thoại nhỏ.",
+      "kept": "Trục căn lề 16dp nhất quán xuyên suốt các khối.",
+      "risk": "Đẩy nút điều khiển chính xuống quá sâu.",
+      "hero": "https://impeccable.style/worlds/cards/crouwel-grid-specimen-hero.webp"
+    },
+    {
+      "id": "challenger-star",
+      "kind": "challenger",
+      "catalogId": "notation-diagram-systems-star-atlas",
+      "verdict": "declined",
+      "label": "Celestial Star Atlas",
+      "lineage": "Bản đồ sao thiên văn nền xanh thẫm & đèn pin đỏ",
+      "thesis": "Nền xanh hải quân thẫm với ký hiệu định vị màu hổ phách ban đêm.",
+      "palette": [
+        "#091326",
+        "#F8FAFC",
+        "#EA580C"
+      ],
+      "materials": [
+        "nền bản đồ đêm",
+        "vòng tròn định vị mảnh"
+      ],
+      "viewport": "Bố cục tọa độ sao tối màu.",
+      "case": "Không hợp với chế độ Light Mode ban ngày mà bạn yêu cầu hỗ trợ song song.",
+      "kept": "Phân cấp độ đậm màu nhấn chỉ tập trung vào hành động chính.",
+      "risk": "Khó đọc ngoài trời nắng nếu giữ nền hải quân.",
+      "hero": "https://impeccable.style/worlds/cards/notation-diagram-systems-star-atlas-hero.webp"
+    }
+  ],
+  "reroll": {
+    "registers": [
+      "safer",
+      "bolder"
+    ]
+  },
+  "buildPath": {
+    "value": "code",
+    "toggle": true
+  },
+  "canon": true,
+  "canonCard": {
+    "kind": "canon",
+    "label": "Material 3 Standard Utility",
+    "thesis": "Giao diện Material You chuẩn mực, thẻ bo tròn và bảng màu động mặc định của Android.",
+    "palette": [
+      "#FDFBFF",
+      "#1C1B1F",
+      "#4F46E5"
+    ],
+    "materials": [
+      "Material 3 Cards",
+      "Dynamic Color"
+    ],
+    "viewport": "Bố cục thẻ cài đặt Material 3 tiêu chuẩn theo chiều dọc.",
+    "risk": "Gọn gàng nhưng dễ giống hàng loạt app Android thông thường.",
+    "html": ".impeccable/mocks/decision/canon.html",
+    "htmlFrame": "390x844",
+    "comp": ".impeccable/mocks/decision/canon.png"
+  },
+  "steer": true
+}

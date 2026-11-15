@@ -1,9 +1,11 @@
 package com.openscreentranslator.app.ui
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
@@ -12,262 +14,707 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.AdapterView
 import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.EditText
-import android.widget.Spinner
+import android.widget.AutoCompleteTextView
+import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
-import com.google.android.material.card.MaterialCardView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
+import androidx.core.widget.NestedScrollView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.slider.Slider
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
 import com.openscreentranslator.app.R
 import com.openscreentranslator.app.data.AppPreferences
+import com.openscreentranslator.app.ocr.ReadingDirection
 import com.openscreentranslator.app.service.FloatingBubbleService
+import com.openscreentranslator.app.translation.HymtEngineHolder
+import com.openscreentranslator.app.translation.HymtEngineState
+import com.openscreentranslator.app.translation.ModelDownloadState
+import com.openscreentranslator.app.translation.ModelManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: AppPreferences
-    private var isServiceRunning = false
 
-    private lateinit var tvStatusTitle: TextView
-    private lateinit var tvStatusDesc: TextView
-    private lateinit var btnToggleService: Button
-    private lateinit var spinnerSource: Spinner
-    private lateinit var spinnerTarget: Spinner
-    private lateinit var spinnerMode: Spinner
-    private lateinit var cardApiKey: MaterialCardView
-    private lateinit var etGeminiApiKey: EditText
-    private lateinit var sliderAutoClear: Slider
-    private lateinit var tvAutoClearLabel: TextView
+    private val languageLabels = listOf(
+        "Tiếng Anh (EN)",
+        "Tiếng Nhật (JA)",
+        "Tiếng Trung (ZH)",
+        "Tiếng Hàn (KO)",
+        "Tiếng Việt (VI)"
+    )
+    private val languageCodes = listOf("en", "ja", "zh", "ko", "vi")
+
+    // UI references
+    private lateinit var btnThemeMode: MaterialButton
+    private lateinit var viewStatusDot: View
+    private lateinit var tvStatusBadge: TextView
+    private lateinit var tvStatusHeadline: TextView
+    private lateinit var tvActiveSummary: TextView
+    private lateinit var layoutOverlayPermission: LinearLayout
+    private lateinit var btnGrantOverlay: MaterialButton
+    private lateinit var btnToggleService: MaterialButton
+
+    private lateinit var dropdownSourceLang: AutoCompleteTextView
+    private lateinit var dropdownTargetLang: AutoCompleteTextView
+    private lateinit var btnSwapLanguages: ImageButton
+
+    private lateinit var rowEngineHymt: LinearLayout
+    private lateinit var rowEngineMlKit: LinearLayout
+    private lateinit var rowEngineGemini: LinearLayout
+    private lateinit var rowEngineCloud: LinearLayout
+    private lateinit var tvHymtEngineTag: TextView
+
+    private lateinit var layoutHymtManager: LinearLayout
+    private lateinit var toggleHymtVariant: MaterialButtonToggleGroup
+    private lateinit var btnVarCompact: MaterialButton
+    private lateinit var btnVarBalanced: MaterialButton
+    private lateinit var btnVarQuality: MaterialButton
+    private lateinit var tvModelVariantDesc: TextView
+    private lateinit var layoutDownloadProgress: LinearLayout
+    private lateinit var progressModelDownload: LinearProgressIndicator
+    private lateinit var tvDownloadProgressStats: TextView
+    private lateinit var btnDownloadOrLoadModel: MaterialButton
+    private lateinit var btnDeleteModel: MaterialButton
+
+    private lateinit var layoutGeminiConfig: LinearLayout
+    private lateinit var etGeminiApiKey: TextInputEditText
+    private lateinit var tvGetApiKey: TextView
+
+    private lateinit var layoutComicModeRow: LinearLayout
+    private lateinit var switchComicMode: MaterialSwitch
+    private lateinit var layoutWholePageRow: LinearLayout
+    private lateinit var switchWholePageContext: MaterialSwitch
+    private lateinit var toggleReadingDirection: MaterialButtonToggleGroup
+    private lateinit var btnDirRtl: MaterialButton
+    private lateinit var btnDirLtr: MaterialButton
+    private lateinit var tvPreviewSpec: TextView
+    private lateinit var comicPreviewView: ComicPreviewView
+
+    private lateinit var tvOpacityValue: TextView
     private lateinit var sliderOpacity: Slider
+    private lateinit var tvTextSizeValue: TextView
     private lateinit var sliderTextSize: Slider
-    private lateinit var tvOpacityLabel: TextView
-    private lateinit var tvTextSizeLabel: TextView
+    private lateinit var tvAutoClearValue: TextView
+    private lateinit var sliderAutoClear: Slider
 
-    private val screenCaptureLauncher = registerForActivityResult(
+    private val mediaProjectionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            startFloatingService(result.resultCode, result.data!!)
+            startTranslatorService(result.resultCode, result.data!!)
         } else {
-            Toast.makeText(this, "Bạn cần đồng ý quyền chụp màn hình để dịch!", Toast.LENGTH_SHORT).show()
+            showNotice("Cần cấp quyền chụp màn hình để dịch.")
         }
     }
 
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
-        if (checkOverlayPermission()) {
-            requestScreenCapture()
-        } else {
-            Toast.makeText(this, "Vui lòng cấp quyền hiển thị trên ứng dụng khác!", Toast.LENGTH_LONG).show()
-        }
+        updatePermissionAndServiceUi()
     }
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ -> }
+    ) {
+        // Proceed with MediaProjection regardless; notification improves stability on API 33+
+        requestMediaProjection()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        prefs = AppPreferences(this)
+        applySavedNightMode(prefs.themeMode)
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        prefs = AppPreferences(this)
-        initViews()
-        setupListeners()
-        requestNotificationPermission()
+        bindViews()
+        applyWindowInsets()
+        setupThemeButton()
+        setupLanguageControls()
+        setupEngineDeck()
+        setupHymtManagerControls()
+        setupGeminiControls()
+        setupComicModeControls()
+        setupCalibrationSliders()
+        setupServiceButtons()
+        observeFlows()
     }
 
-    private fun initViews() {
-        tvStatusTitle = findViewById(R.id.tv_status_title)
-        tvStatusDesc = findViewById(R.id.tv_status_desc)
-        btnToggleService = findViewById(R.id.btn_toggle_service)
-        spinnerSource = findViewById(R.id.spinner_source_lang)
-        spinnerTarget = findViewById(R.id.spinner_target_lang)
-        spinnerMode = findViewById(R.id.spinner_engine_mode)
-        cardApiKey = findViewById(R.id.card_api_key)
-        etGeminiApiKey = findViewById(R.id.et_gemini_api_key)
-        sliderAutoClear = findViewById(R.id.slider_auto_clear)
-        tvAutoClearLabel = findViewById(R.id.tv_auto_clear_label)
-        sliderOpacity = findViewById(R.id.slider_opacity)
-        sliderTextSize = findViewById(R.id.slider_text_size)
-        tvOpacityLabel = findViewById(R.id.tv_opacity_label)
-        tvTextSizeLabel = findViewById(R.id.tv_text_size_label)
-
-        // Languages mapping
-        val languages = listOf(
-            "Tiếng Anh (en)" to "en",
-            "Tiếng Nhật (ja)" to "ja",
-            "Tiếng Trung (zh)" to "zh",
-            "Tiếng Hàn (ko)" to "ko",
-            "Tiếng Việt (vi)" to "vi"
-        )
-
-        val langDisplayNames = languages.map { it.first }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, langDisplayNames)
-        spinnerSource.adapter = adapter
-        spinnerTarget.adapter = adapter
-
-        // Set default selection
-        val srcIndex = languages.indexOfFirst { it.second == prefs.sourceLanguage }.coerceAtLeast(0)
-        spinnerSource.setSelection(srcIndex)
-
-        val targetIndex = languages.indexOfFirst { it.second == prefs.targetLanguage }.coerceAtLeast(4) // default vi
-        spinnerTarget.setSelection(targetIndex)
-
-        // Engine modes
-        val modes = listOf(
-            "Google Gemini AI (Dịch thông minh nhất)" to "gemini_ai",
-            "On-Device (ML Kit - 100% Offline, 0% Data)" to "on_device",
-            "Cloud Free (Google Translate - Không cần Key)" to "cloud_free"
-        )
-        val modeAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, modes.map { it.first })
-        spinnerMode.adapter = modeAdapter
-        val modeIndex = modes.indexOfFirst { it.second == prefs.engineMode }.coerceAtLeast(0)
-        spinnerMode.setSelection(modeIndex)
-
-        // Gemini API Key
-        etGeminiApiKey.setText(prefs.geminiApiKey)
-
-        // Auto-clear slider
-        val currentAutoClear = prefs.autoClearSeconds.toFloat().coerceIn(0f, 30f)
-        sliderAutoClear.value = currentAutoClear
-        updateAutoClearLabel(currentAutoClear.toInt())
-
-        // Sliders
-        sliderOpacity.value = prefs.overlayOpacity.toFloat()
-        tvOpacityLabel.text = "Độ trong suốt khung dịch: ${prefs.overlayOpacity}%"
-
-        sliderTextSize.value = prefs.textSize.toFloat()
-        tvTextSizeLabel.text = "Cỡ chữ bản dịch: ${prefs.textSize}sp"
+    override fun onResume() {
+        super.onResume()
+        updatePermissionAndServiceUi()
+        refreshHymtStatusUi()
+        updateActiveSummaryLine()
     }
 
-    private fun updateAutoClearLabel(seconds: Int) {
-        if (seconds == 0) {
-            tvAutoClearLabel.text = "Tự đóng bản dịch: Tắt (Chỉ đóng khi chạm bong bóng)"
-            tvAutoClearLabel.setTextColor(getColor(R.color.accent))
-        } else {
-            tvAutoClearLabel.text = "Tự đóng bản dịch: Sau $seconds giây"
-            tvAutoClearLabel.setTextColor(getColor(R.color.text_primary))
+    private fun bindViews() {
+        btnThemeMode = findViewById(R.id.btnThemeMode)
+        viewStatusDot = findViewById(R.id.viewStatusDot)
+        tvStatusBadge = findViewById(R.id.tvStatusBadge)
+        tvStatusHeadline = findViewById(R.id.tvStatusHeadline)
+        tvActiveSummary = findViewById(R.id.tvActiveSummary)
+        layoutOverlayPermission = findViewById(R.id.layoutOverlayPermission)
+        btnGrantOverlay = findViewById(R.id.btnGrantOverlay)
+        btnToggleService = findViewById(R.id.btnToggleService)
+
+        dropdownSourceLang = findViewById(R.id.dropdownSourceLang)
+        dropdownTargetLang = findViewById(R.id.dropdownTargetLang)
+        btnSwapLanguages = findViewById(R.id.btnSwapLanguages)
+
+        rowEngineHymt = findViewById(R.id.rowEngineHymt)
+        rowEngineMlKit = findViewById(R.id.rowEngineMlKit)
+        rowEngineGemini = findViewById(R.id.rowEngineGemini)
+        rowEngineCloud = findViewById(R.id.rowEngineCloud)
+        tvHymtEngineTag = findViewById(R.id.tvHymtEngineTag)
+
+        layoutHymtManager = findViewById(R.id.layoutHymtManager)
+        toggleHymtVariant = findViewById(R.id.toggleHymtVariant)
+        btnVarCompact = findViewById(R.id.btnVarCompact)
+        btnVarBalanced = findViewById(R.id.btnVarBalanced)
+        btnVarQuality = findViewById(R.id.btnVarQuality)
+        tvModelVariantDesc = findViewById(R.id.tvModelVariantDesc)
+        layoutDownloadProgress = findViewById(R.id.layoutDownloadProgress)
+        progressModelDownload = findViewById(R.id.progressModelDownload)
+        tvDownloadProgressStats = findViewById(R.id.tvDownloadProgressStats)
+        btnDownloadOrLoadModel = findViewById(R.id.btnDownloadOrLoadModel)
+        btnDeleteModel = findViewById(R.id.btnDeleteModel)
+
+        layoutGeminiConfig = findViewById(R.id.layoutGeminiConfig)
+        etGeminiApiKey = findViewById(R.id.etGeminiApiKey)
+        tvGetApiKey = findViewById(R.id.tvGetApiKey)
+
+        layoutComicModeRow = findViewById(R.id.layoutComicModeRow)
+        switchComicMode = findViewById(R.id.switchComicMode)
+        layoutWholePageRow = findViewById(R.id.layoutWholePageRow)
+        switchWholePageContext = findViewById(R.id.switchWholePageContext)
+        toggleReadingDirection = findViewById(R.id.toggleReadingDirection)
+        btnDirRtl = findViewById(R.id.btnDirRtl)
+        btnDirLtr = findViewById(R.id.btnDirLtr)
+        tvPreviewSpec = findViewById(R.id.tvPreviewSpec)
+        comicPreviewView = findViewById(R.id.comicPreviewView)
+
+        tvOpacityValue = findViewById(R.id.tvOpacityValue)
+        sliderOpacity = findViewById(R.id.sliderOpacity)
+        tvTextSizeValue = findViewById(R.id.tvTextSizeValue)
+        sliderTextSize = findViewById(R.id.sliderTextSize)
+        tvAutoClearValue = findViewById(R.id.tvAutoClearValue)
+        sliderAutoClear = findViewById(R.id.sliderAutoClear)
+    }
+
+    private fun applyWindowInsets() {
+        val scrollView = findViewById<NestedScrollView>(R.id.rootScrollView)
+        val container = findViewById<LinearLayout>(R.id.mainContentContainer)
+        val baseHorizontal = resources.getDimensionPixelSize(R.dimen.atlas_horizontal_margin)
+        val baseTop = dpToPx(12)
+        val baseBottom = dpToPx(28)
+        ViewCompat.setOnApplyWindowInsetsListener(scrollView) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.ime()
+            )
+            container.updatePadding(
+                left = bars.left + baseHorizontal,
+                top = bars.top + baseTop,
+                right = bars.right + baseHorizontal,
+                bottom = bars.bottom + baseBottom
+            )
+            insets
         }
     }
 
-    private fun setupListeners() {
+    private fun showNotice(message: String) {
+        Snackbar.make(findViewById(R.id.rootScrollView), message, Snackbar.LENGTH_SHORT).show()
+    }
+
+    private fun setupThemeButton() {
+        updateThemeButtonLabel()
+        btnThemeMode.setOnClickListener {
+            val next = when (prefs.themeMode) {
+                AppPreferences.THEME_SYSTEM -> AppPreferences.THEME_LIGHT
+                AppPreferences.THEME_LIGHT -> AppPreferences.THEME_DARK
+                else -> AppPreferences.THEME_SYSTEM
+            }
+            prefs.themeMode = next
+            applySavedNightMode(next)
+            updateThemeButtonLabel()
+        }
+    }
+
+    private fun updateThemeButtonLabel() {
+        btnThemeMode.text = when (prefs.themeMode) {
+            AppPreferences.THEME_LIGHT -> getString(R.string.theme_light)
+            AppPreferences.THEME_DARK -> getString(R.string.theme_dark)
+            else -> getString(R.string.theme_system)
+        }
+    }
+
+    private fun applySavedNightMode(mode: String) {
+        val target = when (mode) {
+            AppPreferences.THEME_LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+            AppPreferences.THEME_DARK -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        if (AppCompatDelegate.getDefaultNightMode() != target) {
+            AppCompatDelegate.setDefaultNightMode(target)
+        }
+    }
+
+    private fun setupLanguageControls() {
+        val itemLayout = com.google.android.material.R.layout.mtrl_auto_complete_simple_item
+        val srcAdapter = ArrayAdapter(this, itemLayout, languageLabels)
+        val tgtAdapter = ArrayAdapter(this, itemLayout, languageLabels)
+        dropdownSourceLang.setAdapter(srcAdapter)
+        dropdownTargetLang.setAdapter(tgtAdapter)
+
+        syncLanguageDropdownTexts()
+
+        dropdownSourceLang.setOnItemClickListener { _, _, position, _ ->
+            prefs.sourceLanguage = languageCodes[position]
+            updateActiveSummaryLine()
+        }
+
+        dropdownTargetLang.setOnItemClickListener { _, _, position, _ ->
+            prefs.targetLanguage = languageCodes[position]
+            updateActiveSummaryLine()
+        }
+
+        btnSwapLanguages.setOnClickListener {
+            val currentSrc = prefs.sourceLanguage
+            val currentTgt = prefs.targetLanguage
+            prefs.sourceLanguage = currentTgt
+            prefs.targetLanguage = currentSrc
+            syncLanguageDropdownTexts()
+            updateActiveSummaryLine()
+        }
+    }
+
+    private fun syncLanguageDropdownTexts() {
+        val srcIdx = languageCodes.indexOf(prefs.sourceLanguage).coerceAtLeast(0)
+        val tgtIdx = languageCodes.indexOf(prefs.targetLanguage).coerceAtLeast(4)
+        dropdownSourceLang.setText(languageLabels[srcIdx], false)
+        dropdownTargetLang.setText(languageLabels[tgtIdx], false)
+    }
+
+    private fun setupEngineDeck() {
+        rowEngineHymt.setOnClickListener { selectEngine(AppPreferences.ENGINE_HY_MT2) }
+        rowEngineMlKit.setOnClickListener { selectEngine(AppPreferences.ENGINE_ML_KIT) }
+        rowEngineGemini.setOnClickListener { selectEngine(AppPreferences.ENGINE_GEMINI) }
+        rowEngineCloud.setOnClickListener { selectEngine(AppPreferences.ENGINE_CLOUD_FREE) }
+        updateEngineSelectionUi()
+    }
+
+    private fun selectEngine(mode: String) {
+        prefs.engineMode = mode
+        updateEngineSelectionUi()
+        updateActiveSummaryLine()
+    }
+
+    private fun updateEngineSelectionUi() {
+        val mode = prefs.engineMode
+        rowEngineHymt.setBackgroundResource(
+            if (mode == AppPreferences.ENGINE_HY_MT2) R.drawable.bg_option_selected else R.drawable.bg_option_unselected
+        )
+        rowEngineMlKit.setBackgroundResource(
+            if (mode == AppPreferences.ENGINE_ML_KIT) R.drawable.bg_option_selected else R.drawable.bg_option_unselected
+        )
+        rowEngineGemini.setBackgroundResource(
+            if (mode == AppPreferences.ENGINE_GEMINI) R.drawable.bg_option_selected else R.drawable.bg_option_unselected
+        )
+        rowEngineCloud.setBackgroundResource(
+            if (mode == AppPreferences.ENGINE_CLOUD_FREE) R.drawable.bg_option_selected else R.drawable.bg_option_unselected
+        )
+
+        layoutHymtManager.visibility = if (mode == AppPreferences.ENGINE_HY_MT2) View.VISIBLE else View.GONE
+        layoutGeminiConfig.visibility = if (mode == AppPreferences.ENGINE_GEMINI) View.VISIBLE else View.GONE
+    }
+
+    private fun setupHymtManagerControls() {
+        val checkedId = when (prefs.hymtModelVariant) {
+            "UD_IQ2_M" -> R.id.btnVarCompact
+            "Q4_K_M" -> R.id.btnVarQuality
+            else -> R.id.btnVarBalanced
+        }
+        toggleHymtVariant.check(checkedId)
+
+        toggleHymtVariant.addOnButtonCheckedListener { _, id, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            prefs.hymtModelVariant = when (id) {
+                R.id.btnVarCompact -> "UD_IQ2_M"
+                R.id.btnVarQuality -> "Q4_K_M"
+                else -> "Q3_K_S"
+            }
+            ModelManager.resetStateIfNotDownloading()
+            refreshHymtStatusUi()
+            updateActiveSummaryLine()
+        }
+
+        btnDownloadOrLoadModel.setOnClickListener {
+            val state = ModelManager.downloadState.value
+            val variantId = prefs.hymtModelVariant
+            if (state is ModelDownloadState.Downloading) {
+                ModelManager.cancelDownload()
+                return@setOnClickListener
+            }
+
+            if (ModelManager.isModelInstalled(this, variantId)) {
+                // Pre-warm GGUF in background thread so first screen tap is instant
+                btnDownloadOrLoadModel.isEnabled = false
+                btnDownloadOrLoadModel.text = "Đang nạp vào RAM..."
+                lifecycleScope.launch {
+                    val ok = withContext(Dispatchers.IO) {
+                        HymtEngineHolder.ensureLoaded(this@MainActivity, variantId)
+                    }
+                    btnDownloadOrLoadModel.isEnabled = true
+                    showNotice(
+                        if (ok) "Đã nạp Hy-MT2-1.8B vào bộ nhớ sẵn sàng!" else "Không thể nạp model GGUF."
+                    )
+                    refreshHymtStatusUi()
+                }
+            } else {
+                ModelManager.startDownload(this, variantId)
+            }
+        }
+
+        btnDeleteModel.setOnClickListener {
+            val variant = ModelManager.findVariant(prefs.hymtModelVariant)
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Xóa file model GGUF?")
+                .setMessage("Xóa ${variant.fileName} (~${variant.approxSizeMb} MB) khỏi bộ nhớ thiết bị?")
+                .setNegativeButton("Giữ lại", null)
+                .setPositiveButton("Xóa file") { _, _ ->
+                    ModelManager.deleteModel(this, variant.id)
+                    refreshHymtStatusUi()
+                    updateActiveSummaryLine()
+                    showNotice("Đã xóa file model.")
+                }
+                .show()
+        }
+    }
+
+    private fun refreshHymtStatusUi() {
+        val selected = ModelManager.findVariant(prefs.hymtModelVariant)
+        val installed = ModelManager.isModelInstalled(this, selected.id)
+        val anyInstalled = ModelManager.getAnyInstalledVariant(this, selected.id)
+        val dlState = ModelManager.downloadState.value
+        val engineState = HymtEngineHolder.engineState.value
+
+        tvHymtEngineTag.text = when {
+            dlState is ModelDownloadState.Downloading -> "ĐANG TẢI"
+            engineState is HymtEngineState.Ready && engineState.variantId == selected.id -> "ĐANG NẠP"
+            installed -> "SẴN SÀNG"
+            anyInstalled != null -> anyInstalled.quantLabel
+            else -> "CHƯA TẢI"
+        }
+
+        tvHymtEngineTag.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (installed || anyInstalled != null) R.color.status_active else R.color.ink_muted
+            )
+        )
+
+        val statusSuffix = when {
+            engineState is HymtEngineState.Ready && engineState.variantId == selected.id -> "Đã nạp vào RAM · Sẵn sàng dịch"
+            installed -> "Đã lưu trên máy · Offline 100%"
+            else -> "Chưa tải · Cần kết nối Wi-Fi để tải 1 lần"
+        }
+        tvModelVariantDesc.text = "${selected.summaryVi}\nTrạng thái: $statusSuffix"
+
+        when (dlState) {
+            is ModelDownloadState.Downloading -> {
+                layoutDownloadProgress.visibility = View.VISIBLE
+                val pct = if (dlState.totalBytes > 0) {
+                    ((dlState.downloadedBytes * 100L) / dlState.totalBytes).toInt().coerceIn(0, 100)
+                } else 0
+                progressModelDownload.setProgressCompat(pct, true)
+                val dlMb = dlState.downloadedBytes / (1024f * 1024f)
+                val totMb = dlState.totalBytes / (1024f * 1024f)
+                val spdMb = dlState.speedBytesPerSec / (1024f * 1024f)
+                tvDownloadProgressStats.text = "%.0f / %.0f MB · %.1f MB/s (%d%%)".format(dlMb, totMb, spdMb, pct)
+                btnDownloadOrLoadModel.text = "Hủy tải xuống"
+                btnDownloadOrLoadModel.isEnabled = true
+                btnDeleteModel.visibility = View.GONE
+            }
+
+            is ModelDownloadState.Error -> {
+                layoutDownloadProgress.visibility = View.VISIBLE
+                progressModelDownload.progress = 0
+                tvDownloadProgressStats.text = "Lỗi: ${dlState.message}"
+                btnDownloadOrLoadModel.text = "Thử tải lại (${selected.quantLabel})"
+                btnDownloadOrLoadModel.isEnabled = true
+                btnDeleteModel.visibility = if (installed) View.VISIBLE else View.GONE
+            }
+
+            else -> {
+                layoutDownloadProgress.visibility = View.GONE
+                if (installed) {
+                    btnDownloadOrLoadModel.text = if (engineState is HymtEngineState.Ready && engineState.variantId == selected.id) {
+                        "Đã nạp sẵn (${selected.quantLabel})"
+                    } else {
+                        "Nạp trước vào RAM (${selected.quantLabel})"
+                    }
+                    btnDeleteModel.visibility = View.VISIBLE
+                } else {
+                    btnDownloadOrLoadModel.text = "Tải ${selected.quantLabel} (${selected.approxSizeMb} MB)"
+                    btnDeleteModel.visibility = View.GONE
+                }
+                btnDownloadOrLoadModel.isEnabled = true
+            }
+        }
+    }
+
+    private fun setupGeminiControls() {
+        etGeminiApiKey.setText(prefs.geminiApiKey)
+        etGeminiApiKey.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                prefs.geminiApiKey = s?.toString()?.trim().orEmpty()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        tvGetApiKey.setOnClickListener {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/apikey")))
+        }
+    }
+
+    private fun setupComicModeControls() {
+        switchComicMode.isChecked = prefs.comicModeEnabled
+        switchWholePageContext.isChecked = prefs.wholePageContextEnabled
+
+        toggleReadingDirection.check(
+            if (prefs.readingDirection == AppPreferences.DIRECTION_LTR) R.id.btnDirLtr else R.id.btnDirRtl
+        )
+
+        layoutComicModeRow.setOnClickListener { switchComicMode.toggle() }
+        switchComicMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.comicModeEnabled = isChecked
+            syncPreviewPlate()
+            updateActiveSummaryLine()
+        }
+
+        layoutWholePageRow.setOnClickListener { switchWholePageContext.toggle() }
+        switchWholePageContext.setOnCheckedChangeListener { _, isChecked ->
+            prefs.wholePageContextEnabled = isChecked
+        }
+
+        toggleReadingDirection.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            prefs.readingDirection = if (checkedId == R.id.btnDirLtr) {
+                AppPreferences.DIRECTION_LTR
+            } else {
+                AppPreferences.DIRECTION_RTL
+            }
+            syncPreviewPlate()
+            updateActiveSummaryLine()
+        }
+
+        syncPreviewPlate()
+    }
+
+    private fun setupCalibrationSliders() {
+        sliderOpacity.value = prefs.overlayOpacity.coerceIn(65, 100).toFloat()
+        tvOpacityValue.text = "${prefs.overlayOpacity}%"
+        sliderOpacity.addOnChangeListener { _, value, _ ->
+            val v = value.toInt()
+            prefs.overlayOpacity = v
+            tvOpacityValue.text = "$v%"
+            syncPreviewPlate()
+        }
+
+        sliderTextSize.value = prefs.textSize.coerceIn(10, 24).toFloat()
+        tvTextSizeValue.text = "${prefs.textSize} sp"
+        sliderTextSize.addOnChangeListener { _, value, _ ->
+            val v = value.toInt()
+            prefs.textSize = v
+            tvTextSizeValue.text = "$v sp"
+            syncPreviewPlate()
+        }
+
+        sliderAutoClear.value = prefs.autoClearSeconds.coerceIn(0, 30).toFloat()
+        tvAutoClearValue.text = if (prefs.autoClearSeconds == 0) "Tắt" else "${prefs.autoClearSeconds} s"
+        sliderAutoClear.addOnChangeListener { _, value, _ ->
+            val v = value.toInt()
+            prefs.autoClearSeconds = v
+            tvAutoClearValue.text = if (v == 0) "Tắt" else "$v s"
+        }
+
+        syncPreviewPlate()
+    }
+
+    private fun syncPreviewPlate() {
+        val dir = if (prefs.readingDirection == AppPreferences.DIRECTION_LTR) {
+            ReadingDirection.COMIC_LTR
+        } else {
+            ReadingDirection.MANGA_RTL
+        }
+        comicPreviewView.readingDirection = dir
+        comicPreviewView.comicModeEnabled = prefs.comicModeEnabled
+        comicPreviewView.overlayOpacityPercent = prefs.overlayOpacity
+        comicPreviewView.previewTextSizeSp = prefs.textSize
+
+        val dirTag = if (!prefs.comicModeEnabled) {
+            "Gộp tắt"
+        } else if (dir == ReadingDirection.MANGA_RTL) {
+            "R→L"
+        } else {
+            "L→R"
+        }
+        tvPreviewSpec.text = "$dirTag · ${prefs.overlayOpacity}% · ${prefs.textSize}sp"
+    }
+
+    private fun setupServiceButtons() {
+        btnGrantOverlay.setOnClickListener {
+            val intent = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:$packageName")
+            )
+            overlayPermissionLauncher.launch(intent)
+        }
+
         btnToggleService.setOnClickListener {
-            if (!isServiceRunning) {
-                if (!checkOverlayPermission()) {
+            if (FloatingBubbleService.isRunning.value) {
+                stopService(Intent(this, FloatingBubbleService::class.java))
+                updatePermissionAndServiceUi()
+            } else {
+                if (!Settings.canDrawOverlays(this)) {
+                    showNotice("Vui lòng cấp quyền hiển thị nổi trước.")
                     val intent = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:$packageName")
                     )
                     overlayPermissionLauncher.launch(intent)
-                } else {
-                    requestScreenCapture()
+                    return@setOnClickListener
                 }
-            } else {
-                stopFloatingService()
-            }
-        }
+                if (prefs.engineMode == AppPreferences.ENGINE_GEMINI && prefs.geminiApiKey.isBlank()) {
+                    showNotice("Bạn chưa nhập Gemini API Key!")
+                    return@setOnClickListener
+                }
 
-        val languages = listOf("en", "ja", "zh", "ko", "vi")
-        spinnerSource.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                prefs.sourceLanguage = languages[position]
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        spinnerTarget.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                prefs.targetLanguage = languages[position]
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        val modes = listOf("gemini_ai", "on_device", "cloud_free")
-        spinnerMode.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                prefs.engineMode = modes[position]
-                cardApiKey.visibility = if (modes[position] == "gemini_ai") View.VISIBLE else View.GONE
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
-        }
-
-        etGeminiApiKey.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                prefs.geminiApiKey = s?.toString()?.trim() ?: ""
-            }
-            override fun afterTextChanged(s: Editable?) {}
-        })
-
-        sliderAutoClear.addOnChangeListener { _, value, _ ->
-            val seconds = value.toInt()
-            prefs.autoClearSeconds = seconds
-            updateAutoClearLabel(seconds)
-        }
-
-        sliderOpacity.addOnChangeListener { _, value, _ ->
-            prefs.overlayOpacity = value.toInt()
-            tvOpacityLabel.text = "Độ trong suốt khung dịch: ${value.toInt()}%"
-        }
-
-        sliderTextSize.addOnChangeListener { _, value, _ ->
-            prefs.textSize = value.toInt()
-            tvTextSizeLabel.text = "Cỡ chữ bản dịch: ${value.toInt()}sp"
-        }
-    }
-
-    private fun checkOverlayPermission(): Boolean {
-        return Settings.canDrawOverlays(this)
-    }
-
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED
+                ) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    requestMediaProjection()
+                }
             }
         }
     }
 
-    private fun requestScreenCapture() {
+    private fun requestMediaProjection() {
         val mpManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        screenCaptureLauncher.launch(mpManager.createScreenCaptureIntent())
+        mediaProjectionLauncher.launch(mpManager.createScreenCaptureIntent())
     }
 
-    private fun startFloatingService(resultCode: Int, data: Intent) {
+    private fun startTranslatorService(resultCode: Int, data: Intent) {
         val serviceIntent = Intent(this, FloatingBubbleService::class.java).apply {
             putExtra("resultCode", resultCode)
             putExtra("data", data)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
+        startForegroundService(serviceIntent)
+        updatePermissionAndServiceUi()
+    }
+
+    private fun observeFlows() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    FloatingBubbleService.isRunning.collect {
+                        updatePermissionAndServiceUi()
+                    }
+                }
+                launch {
+                    ModelManager.downloadState.collect {
+                        refreshHymtStatusUi()
+                        updateActiveSummaryLine()
+                    }
+                }
+                launch {
+                    HymtEngineHolder.engineState.collect {
+                        refreshHymtStatusUi()
+                        updateActiveSummaryLine()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updatePermissionAndServiceUi() {
+        val hasOverlay = Settings.canDrawOverlays(this)
+        val running = FloatingBubbleService.isRunning.value
+
+        layoutOverlayPermission.visibility = if (hasOverlay) View.GONE else View.VISIBLE
+
+        if (running) {
+            viewStatusDot.setBackgroundResource(R.drawable.dot_status_active)
+            tvStatusBadge.text = "ĐANG CHẠY"
+            tvStatusBadge.setTextColor(ContextCompat.getColor(this, R.color.status_active))
+            tvStatusHeadline.text = "Nút nổi đang hoạt động trên màn hình"
+            btnToggleService.text = "Dừng dịch màn hình"
+            btnToggleService.backgroundTintList =
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.status_danger_fill))
         } else {
-            startService(serviceIntent)
+            viewStatusDot.setBackgroundResource(R.drawable.dot_status_idle)
+            tvStatusBadge.text = if (hasOverlay) "TẠM DỪNG" else "CHƯA CẤP QUYỀN"
+            tvStatusBadge.setTextColor(
+                ContextCompat.getColor(
+                    this,
+                    if (hasOverlay) R.color.ink_muted else R.color.status_warning
+                )
+            )
+            tvStatusHeadline.text = if (hasOverlay) {
+                "Sẵn sàng dịch trên mọi ứng dụng"
+            } else {
+                "Cần quyền Hiển thị trên ứng dụng khác"
+            }
+            btnToggleService.text = getString(R.string.start_service)
+            btnToggleService.backgroundTintList =
+                ColorStateList.valueOf(ContextCompat.getColor(this, R.color.accent_vermilion))
         }
-
-        isServiceRunning = true
-        tvStatusTitle.text = "Trạng thái: Đang hoạt động"
-        tvStatusDesc.text = "Bong bóng dịch đang nổi trên màn hình. Chạm vào bong bóng để Dịch / Đóng bản dịch."
-        btnToggleService.text = "DỪNG DỊCH NỀN"
-        btnToggleService.setBackgroundColor(getColor(android.R.color.holo_red_dark))
     }
 
-    private fun stopFloatingService() {
-        val stopIntent = Intent(this, FloatingBubbleService::class.java).apply {
-            action = "ACTION_STOP"
+    private fun updateActiveSummaryLine() {
+        val src = prefs.sourceLanguage.uppercase()
+        val tgt = prefs.targetLanguage.uppercase()
+        val engineLabel = when (prefs.engineMode) {
+            AppPreferences.ENGINE_HY_MT2 -> {
+                val installed = ModelManager.getAnyInstalledVariant(this, prefs.hymtModelVariant)
+                if (installed != null) "Hy-MT2 ${installed.quantLabel}" else "Hy-MT2 (Chưa tải)"
+            }
+            AppPreferences.ENGINE_GEMINI -> "Gemini AI"
+            AppPreferences.ENGINE_CLOUD_FREE -> "Google Translate"
+            else -> "Google ML Kit"
         }
-        startService(stopIntent)
-
-        isServiceRunning = false
-        tvStatusTitle.text = "Trạng thái: Chưa kích hoạt"
-        tvStatusDesc.text = "Nhấn nút bên dưới để khởi động bong bóng dịch chạy nền."
-        btnToggleService.text = "BẬT DỊCH NỀN"
-        btnToggleService.setBackgroundColor(getColor(R.color.primary))
+        val modeLabel = when {
+            !prefs.comicModeEnabled -> "Dịch thường"
+            prefs.readingDirection == AppPreferences.DIRECTION_LTR -> "Webtoon L→R"
+            else -> "Manga R→L"
+        }
+        tvActiveSummary.text = "$src → $tgt · $engineLabel · $modeLabel"
     }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 }

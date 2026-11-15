@@ -1,23 +1,34 @@
 package com.openscreentranslator.app.overlay
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
+import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
-import android.widget.ImageView
-import android.widget.ProgressBar
+import android.widget.ImageButton
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import com.openscreentranslator.app.R
 import com.openscreentranslator.app.data.AppPreferences
-import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.abs
 
 class OverlayManager(
     private val context: Context,
@@ -25,239 +36,264 @@ class OverlayManager(
 ) {
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val prefs = AppPreferences(context)
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var bubbleView: View? = null
+    private var bubbleButton: ImageButton? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
-    private val activeTranslationViews = CopyOnWriteArrayList<View>()
+    private val translationCards = mutableListOf<View>()
 
-    private var autoClearRunnable: Runnable? = null
-    private var isShowing = false
+    private val handler = Handler(Looper.getMainLooper())
+    private val autoClearRunnable = Runnable { clearTranslationCards() }
 
-    private fun dpToPx(dp: Int): Int {
-        return (dp * context.resources.displayMetrics.density).toInt()
-    }
+    private val layoutType: Int
+        get() = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 
-    fun isShowingTranslations(): Boolean = isShowing
-
+    @SuppressLint("ClickableViewAccessibility")
     fun showFloatingBubble() {
         if (bubbleView != null) return
 
-        mainHandler.post {
-            val inflater = LayoutInflater.from(context)
-            val view = inflater.inflate(R.layout.layout_floating_bubble, null)
+        bubbleView = LayoutInflater.from(context).inflate(R.layout.layout_floating_bubble, null)
+        bubbleButton = bubbleView?.findViewById(R.id.btnFloatingBubble)
 
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                x = 50
-                y = 300
-            }
+        bubbleParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            layoutType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 24
+            y = 320
+        }
 
-            var initialX = 0
-            var initialY = 0
-            var initialTouchX = 0f
-            var initialTouchY = 0f
-            var isClick = false
+        val clickThreshold = dpToPx(10)
+        bubbleButton?.setOnTouchListener(object : View.OnTouchListener {
+            private var initialX = 0
+            private var initialY = 0
+            private var initialTouchX = 0f
+            private var initialTouchY = 0f
+            private var isMoved = false
 
-            view.setOnTouchListener { _, event ->
+            override fun onTouch(v: View, event: MotionEvent): Boolean {
+                val params = bubbleParams ?: return false
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
-                        isClick = true
-                        true
+                        isMoved = false
+                        return true
                     }
+
                     MotionEvent.ACTION_MOVE -> {
                         val dx = (event.rawX - initialTouchX).toInt()
                         val dy = (event.rawY - initialTouchY).toInt()
-                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                            isClick = false
+                        if (abs(dx) > clickThreshold || abs(dy) > clickThreshold) {
+                            isMoved = true
                         }
                         params.x = initialX + dx
                         params.y = initialY + dy
-                        try {
-                            windowManager.updateViewLayout(view, params)
-                        } catch (_: Exception) {}
-                        true
+                        bubbleView?.let { windowManager.updateViewLayout(it, params) }
+                        return true
                     }
+
                     MotionEvent.ACTION_UP -> {
-                        if (isClick) {
+                        if (!isMoved) {
                             onBubbleClick()
                         }
-                        true
+                        return true
                     }
-                    else -> false
                 }
+                return false
             }
+        })
 
-            try {
-                windowManager.addView(view, params)
-                bubbleView = view
-                bubbleParams = params
-            } catch (e: Exception) {
-                e.printStackTrace()
+        windowManager.addView(bubbleView, bubbleParams)
+    }
+
+    fun removeFloatingBubble() {
+        clearTranslationCards()
+        bubbleView?.let {
+            windowManager.removeView(it)
+            bubbleView = null
+            bubbleButton = null
+        }
+    }
+
+    fun setBubbleLoading(loading: Boolean) {
+        handler.post {
+            bubbleButton?.apply {
+                isEnabled = !loading
+                setImageResource(
+                    if (loading) R.drawable.ic_translate_active else R.drawable.ic_translate
+                )
+                setBackgroundResource(
+                    if (loading) R.drawable.bubble_background_active else R.drawable.bubble_background
+                )
+                alpha = if (loading) 0.96f else 1.0f
             }
         }
     }
 
-    fun setBubbleLoading(isLoading: Boolean) {
-        mainHandler.post {
-            bubbleView?.let { view ->
-                val icon = view.findViewById<ImageView>(R.id.bubble_icon)
-                val progress = view.findViewById<ProgressBar>(R.id.bubble_progress)
-                if (isLoading) {
-                    icon.visibility = View.GONE
-                    progress.visibility = View.VISIBLE
-                } else {
-                    progress.visibility = View.GONE
-                    icon.visibility = View.VISIBLE
-                    updateBubbleIcon()
-                }
-            }
-        }
-    }
+    fun drawTranslationCards(
+        results: List<Pair<String, Rect>>,
+        showBubbleOrderIndex: Boolean = prefs.comicModeEnabled && results.size > 1
+    ) {
+        handler.post {
+            clearTranslationCardsImmediate()
+            if (results.isEmpty()) return@post
 
-    private fun updateBubbleIcon() {
-        bubbleView?.let { view ->
-            val icon = view.findViewById<ImageView>(R.id.bubble_icon)
-            if (isShowing) {
-                icon.setImageResource(R.drawable.ic_close)
-            } else {
-                icon.setImageResource(R.drawable.ic_translate)
-            }
-        }
-    }
+            val themedCtx = createThemedOverlayContext()
+            val (screenW, screenH) = currentScreenBounds()
+            val safeMargin = dpToPx(8)
+            val topMargin = dpToPx(24)
+            val bottomMargin = dpToPx(48)
 
-    fun drawTranslationCards(translations: List<Pair<String, Rect>>) {
-        mainHandler.post {
-            // Cancel any previous auto-clear timer
-            cancelAutoClearTimer()
-            clearTranslationViewsInternal()
+            val alphaPercent = prefs.overlayOpacity.coerceIn(65, 100)
+            val bgAlpha = (alphaPercent * 255) / 100
+            val textSizeSp = prefs.textSize.coerceIn(10, 24).toFloat()
 
-            if (translations.isEmpty()) {
-                isShowing = false
-                updateBubbleIcon()
-                return@post
-            }
+            val baseBgColor = ContextCompat.getColor(themedCtx, R.color.overlay_card_bg)
+            val strokeColor = ContextCompat.getColor(themedCtx, R.color.overlay_card_stroke)
+            val textColor = ContextCompat.getColor(themedCtx, R.color.overlay_card_text)
+            val badgeColor = ContextCompat.getColor(themedCtx, R.color.overlay_badge_bg)
+            val bgColorWithAlpha = ColorUtils.setAlphaComponent(baseBgColor, bgAlpha)
 
-            val alphaVal = (prefs.overlayOpacity * 255 / 100).coerceIn(0, 255)
-            val textSizeSp = prefs.textSize.toFloat()
+            results.forEachIndexed { idx, (translatedText, rect) ->
+                if (translatedText.isBlank()) return@forEachIndexed
 
-            for ((translatedText, rect) in translations) {
-                val textView = TextView(context).apply {
-                    text = translatedText
-                    setTextColor(Color.WHITE)
-                    textSize = textSizeSp
+                val tv = TextView(themedCtx).apply {
+                    setTextColor(textColor)
+                    this.textSize = textSizeSp
+                    fontFeatureSettings = "tnum"
+                    setLineSpacing(dpToPx(2).toFloat(), 1.08f)
                     gravity = Gravity.CENTER
-                    val pad = dpToPx(6)
-                    setPadding(pad, pad, pad, pad)
+
+                    text = if (showBubbleOrderIndex) {
+                        val prefix = "[%02d] ".format(idx + 1)
+                        SpannableStringBuilder(prefix).apply {
+                            setSpan(ForegroundColorSpan(badgeColor), 0, prefix.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            setSpan(StyleSpan(Typeface.BOLD), 0, prefix.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            setSpan(RelativeSizeSpan(0.84f), 0, prefix.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            append(translatedText)
+                        }
+                    } else {
+                        translatedText
+                    }
+
+                    setPadding(dpToPx(9), dpToPx(6), dpToPx(9), dpToPx(6))
+
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.RECTANGLE
+                        cornerRadius = dpToPx(10).toFloat()
+                        setColor(bgColorWithAlpha)
+                        setStroke(dpToPx(1), strokeColor)
+                    }
                 }
 
-                val bg = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    cornerRadius = dpToPx(8).toFloat()
-                    setColor(Color.argb(alphaVal, 15, 23, 42)) // Slate 900 background
-                    setStroke(dpToPx(1), Color.argb(alphaVal, 0, 230, 118)) // Accent green border
+                // Expand narrow vertical CJK speech bubbles horizontally so Vietnamese text reads cleanly
+                val maxAllowedWidth = (screenW - safeMargin * 2).coerceAtLeast(dpToPx(120))
+                val isVerticalBubble = rect.height() > rect.width() * 1.35f
+                val targetWidth = if (isVerticalBubble) {
+                    maxOf(rect.width(), dpToPx(188)).coerceAtMost(maxAllowedWidth)
+                } else {
+                    maxOf(rect.width(), dpToPx(104)).coerceAtMost(maxAllowedWidth)
                 }
-                textView.background = bg
 
-                val minWidth = dpToPx(60)
-                val width = rect.width().coerceAtLeast(minWidth)
+                // Estimate height for safe vertical clamping within viewport
+                val widthSpec = View.MeasureSpec.makeMeasureSpec(targetWidth, View.MeasureSpec.EXACTLY)
+                val heightSpec = View.MeasureSpec.makeMeasureSpec(screenH, View.MeasureSpec.AT_MOST)
+                tv.measure(widthSpec, heightSpec)
+                val estHeight = tv.measuredHeight.coerceAtLeast(dpToPx(36))
+
+                val desiredX = rect.centerX() - targetWidth / 2
+                val clampedX = desiredX.coerceIn(safeMargin, (screenW - safeMargin - targetWidth).coerceAtLeast(safeMargin))
+
+                val desiredY = if (isVerticalBubble) {
+                    (rect.centerY() - estHeight / 2).coerceAtLeast(rect.top)
+                } else {
+                    rect.top
+                }
+                val maxY = (screenH - bottomMargin - estHeight).coerceAtLeast(topMargin)
+                val clampedY = desiredY.coerceIn(topMargin, maxY)
+
                 val params = WindowManager.LayoutParams(
-                    width,
+                    targetWidth,
                     WindowManager.LayoutParams.WRAP_CONTENT,
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    layoutType,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                     PixelFormat.TRANSLUCENT
                 ).apply {
                     gravity = Gravity.TOP or Gravity.START
-                    x = rect.left
-                    y = rect.top
+                    x = clampedX
+                    y = clampedY
                 }
 
-                // Long press on a card to dismiss just this card
-                textView.setOnLongClickListener {
-                    removeViewSafely(textView)
+                tv.setOnClickListener {
+                    clearTranslationCards()
+                }
+                tv.setOnLongClickListener {
+                    windowManager.removeView(tv)
+                    translationCards.remove(tv)
                     true
                 }
 
-                try {
-                    windowManager.addView(textView, params)
-                    activeTranslationViews.add(textView)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                windowManager.addView(tv, params)
+                translationCards.add(tv)
             }
 
-            isShowing = true
-            updateBubbleIcon()
-
-            // Schedule auto-clear only if user set it > 0 (0 = manual toggle only)
-            val delaySeconds = prefs.autoClearSeconds
-            if (delaySeconds > 0) {
-                autoClearRunnable = Runnable {
-                    clearTranslationCards()
-                }
-                mainHandler.postDelayed(autoClearRunnable!!, delaySeconds * 1000L)
+            val autoClearSec = prefs.autoClearSeconds
+            if (autoClearSec > 0) {
+                handler.postDelayed(autoClearRunnable, autoClearSec * 1000L)
             }
-        }
-    }
-
-    private fun cancelAutoClearTimer() {
-        autoClearRunnable?.let {
-            mainHandler.removeCallbacks(it)
-            autoClearRunnable = null
         }
     }
 
     fun clearTranslationCards() {
-        mainHandler.post {
-            cancelAutoClearTimer()
-            clearTranslationViewsInternal()
-            isShowing = false
-            updateBubbleIcon()
-        }
+        handler.post { clearTranslationCardsImmediate() }
     }
 
-    private fun clearTranslationViewsInternal() {
-        for (view in activeTranslationViews) {
+    private fun clearTranslationCardsImmediate() {
+        handler.removeCallbacks(autoClearRunnable)
+        val iterator = translationCards.iterator()
+        while (iterator.hasNext()) {
+            val view = iterator.next()
             try {
                 windowManager.removeView(view)
-            } catch (_: Exception) {}
-        }
-        activeTranslationViews.clear()
-    }
-
-    private fun removeViewSafely(view: View) {
-        try {
-            windowManager.removeView(view)
-        } catch (_: Exception) {}
-        activeTranslationViews.remove(view)
-        if (activeTranslationViews.isEmpty()) {
-            isShowing = false
-            updateBubbleIcon()
-        }
-    }
-
-    fun removeFloatingBubble() {
-        mainHandler.post {
-            cancelAutoClearTimer()
-            clearTranslationViewsInternal()
-            bubbleView?.let {
-                try {
-                    windowManager.removeView(it)
-                } catch (_: Exception) {}
-                bubbleView = null
+            } catch (_: Exception) {
             }
-            isShowing = false
+            iterator.remove()
         }
+    }
+
+    fun isShowingTranslations(): Boolean = translationCards.isNotEmpty()
+
+    private fun createThemedOverlayContext(): Context {
+        val uiNightFlag = when (prefs.themeMode) {
+            AppPreferences.THEME_LIGHT -> Configuration.UI_MODE_NIGHT_NO
+            AppPreferences.THEME_DARK -> Configuration.UI_MODE_NIGHT_YES
+            else -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        }
+        val config = Configuration(context.resources.configuration)
+        config.uiMode = (config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or uiNightFlag
+        return context.createConfigurationContext(config)
+    }
+
+    private fun currentScreenBounds(): Pair<Int, Int> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.currentWindowMetrics.bounds
+            bounds.width() to bounds.height()
+        } else {
+            val dm = DisplayMetrics()
+            @Suppress("DEPRECATION")
+            windowManager.defaultDisplay.getRealMetrics(dm)
+            dm.widthPixels to dm.heightPixels
+        }
+    }
+
+    private fun dpToPx(dp: Int): Int {
+        return (dp * context.resources.displayMetrics.density).toInt()
     }
 }

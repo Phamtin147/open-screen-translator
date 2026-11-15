@@ -14,7 +14,8 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 
 data class OcrBlock(
     val text: String,
-    val boundingBox: Rect
+    val boundingBox: Rect,
+    val orderIndex: Int = 0
 )
 
 class OcrManager {
@@ -34,29 +35,53 @@ class OcrManager {
 
     fun processImage(
         bitmap: Bitmap,
-        sourceLanguage: String,
+        languageCode: String,
+        comicModeEnabled: Boolean = true,
+        readingDirection: ReadingDirection = ReadingDirection.MANGA_RTL,
         onSuccess: (List<OcrBlock>) -> Unit,
         onError: (Exception) -> Unit
     ) {
         val inputImage = InputImage.fromBitmap(bitmap, 0)
-        val recognizer = getRecognizer(sourceLanguage)
+        val recognizer = getRecognizer(languageCode)
 
         recognizer.process(inputImage)
             .addOnSuccessListener { visionText: Text ->
-                val resultList = mutableListOf<OcrBlock>()
-                for (block in visionText.textBlocks) {
-                    val text = block.text.trim()
-                    val box = block.boundingBox
-                    if (text.isNotBlank() && box != null) {
-                        resultList.add(OcrBlock(text, box))
+                val rawBlocks = visionText.textBlocks.mapNotNull { block ->
+                    val box = block.boundingBox ?: return@mapNotNull null
+                    val rawText = block.text.trim()
+                    if (rawText.isBlank()) return@mapNotNull null
+
+                    val lines = block.lines.mapNotNull inner@{ line ->
+                        val lineBox = line.boundingBox ?: return@inner null
+                        val lineText = line.text.trim()
+                        if (lineText.isBlank()) null else OcrLine(lineText, lineBox.toRectBox())
                     }
+                    RawOcrBlock(
+                        text = rawText,
+                        box = box.toRectBox(),
+                        lines = lines
+                    )
                 }
-                Log.d(TAG, "OCR detected ${resultList.size} text blocks")
+
+                val processed = ComicBubbleProcessor.processBlocks(
+                    rawBlocks = rawBlocks,
+                    sourceLang = languageCode,
+                    comicModeEnabled = comicModeEnabled,
+                    readingDirection = readingDirection
+                )
+
+                val resultList = processed.map { bubble ->
+                    OcrBlock(
+                        text = bubble.text,
+                        boundingBox = bubble.box.toAndroidRect(),
+                        orderIndex = bubble.orderIndex
+                    )
+                }
                 onSuccess(resultList)
             }
-            .addOnFailureListener { exception ->
-                Log.e(TAG, "OCR recognition failed", exception)
-                onError(exception)
+            .addOnFailureListener { e ->
+                Log.e(TAG, "OCR failed for $languageCode", e)
+                onError(e)
             }
     }
 
@@ -64,4 +89,8 @@ class OcrManager {
         recognizerCache.values.forEach { it.close() }
         recognizerCache.clear()
     }
+
+    private fun Rect.toRectBox(): RectBox = RectBox(left, top, right, bottom)
+
+    private fun RectBox.toAndroidRect(): Rect = Rect(left, top, right, bottom)
 }

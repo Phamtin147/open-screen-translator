@@ -3,7 +3,15 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
-  <path
-      android:fillColor="#FFFFFFFF"
-      android:pathData="M12.87,15.07L10.33,12.56L10.36,12.53C12.1,10.59 13.34,8.36 14.07,6H17V4H10V2H8V4H1V6H12.17C11.5,7.92 10.44,9.75 9,11.35C8.07,10.32 7.3,9.19 6.69,8H4.69C5.42,9.63 6.42,11.17 7.67,12.56L2.58,17.58L4,19L9,14L12.11,17.11L12.87,15.07M18.5,10H16.5L12,22H14L15.12,19H19.87L21,22H23L18.5,10M15.88,17L17.5,12.67L19.12,17H15.88Z"/>
+    <!-- Celestial Translation Crosshair Viewfinder -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FAF7F0"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M4,6.5C4,5.4 4.9,4.5 6,4.5H15C16.1,4.5 17,5.4 17,6.5V12.5C17,13.6 16.1,14.5 15,14.5H9L5.5,17.5V14.5H6C4.9,14.5 4,13.6 4,12.5V6.5Z" />
+    <path
+        android:fillColor="#E85427"
+        android:pathData="M18.5,10.5L19.5,13.2L22.2,14.2L19.5,15.2L18.5,18L17.5,15.2L14.8,14.2L17.5,13.2Z" />
 </vector>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.OpenScreenTranslator" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent_vermilion</item>
+        <item name="colorOnPrimary">@color/on_accent</item>
+        <item name="colorPrimaryContainer">@color/accent_vermilion_soft</item>
+        <item name="colorOnPrimaryContainer">@color/ink_primary</item>
+
+        <item name="colorSecondary">@color/ink_muted</item>
+        <item name="colorOnSecondary">@color/surface_card</item>
+        <item name="colorSecondaryContainer">@color/surface_recessed</item>
+        <item name="colorOnSecondaryContainer">@color/ink_primary</item>
+
+        <item name="android:colorBackground">@color/surface_ground</item>
+        <item name="android:windowBackground">@color/surface_ground</item>
+        <item name="colorSurface">@color/surface_card</item>
+        <item name="colorOnSurface">@color/ink_primary</item>
+        <item name="colorSurfaceVariant">@color/surface_recessed</item>
+        <item name="colorOnSurfaceVariant">@color/ink_secondary</item>
+        <item name="colorOutline">@color/hairline_strong</item>
+        <item name="colorOutlineVariant">@color/hairline_stroke</item>
+
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
