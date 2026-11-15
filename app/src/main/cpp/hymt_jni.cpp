@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <mutex>
@@ -25,10 +27,10 @@
 
 namespace {
 
-constexpr int kContextSize = 2048;
+constexpr int kContextSize = 1024;
 constexpr int kBatchSize = 512;
 constexpr int kMinThreads = 2;
-constexpr int kMaxThreads = 6;
+constexpr int kMaxThreads = 4;
 
 std::mutex g_mutex;
 bool g_backend_initialized = false;
@@ -50,8 +52,11 @@ void android_llama_log(ggml_log_level level, const char *text, void * /*user_dat
     }
 }
 
+static llama_tokens g_cached_tokens;
+
 void free_model_locked() {
     g_chat_templates.reset();
+    g_cached_tokens.clear();
     if (g_context) {
         llama_free(g_context);
         g_context = nullptr;
@@ -125,12 +130,16 @@ int compute_thread_count() {
     return std::max(kMinThreads, std::min(4, cpu_count / 2));
 }
 
-bool decode_tokens(llama_context *ctx, common_batch &batch, const llama_tokens &tokens) {
-    for (int i = 0; i < static_cast<int>(tokens.size()); i += kBatchSize) {
-        const int cur = std::min(static_cast<int>(tokens.size()) - i, kBatchSize);
+bool decode_tokens(llama_context *ctx, common_batch &batch, const llama_tokens &tokens, size_t start_pos = 0) {
+    const int n = static_cast<int>(tokens.size());
+    for (int i = static_cast<int>(start_pos); i < n; i += kBatchSize) {
+        if (g_cancel_requested.load()) {
+            return false;
+        }
+        const int cur = std::min(n - i, kBatchSize);
         batch.clear();
         for (int j = 0; j < cur; ++j) {
-            const bool want_logit = (i + j == static_cast<int>(tokens.size()) - 1);
+            const bool want_logit = (i + j == n - 1);
             batch.add(tokens[i + j], i + j, 0, want_logit);
         }
         if (llama_process(ctx, LLAMA_PROCESS_TYPE_DECODE, batch.get()) != 0) {
@@ -141,22 +150,35 @@ bool decode_tokens(llama_context *ctx, common_batch &batch, const llama_tokens &
 }
 
 std::string format_hymt_prompt(const std::string &user_prompt) {
-    if (g_chat_templates) {
-        common_chat_templates_inputs inputs;
-        common_chat_msg msg;
-        msg.role = "user";
-        msg.content = user_prompt;
-        inputs.messages = {msg};
-        inputs.add_generation_prompt = true;
-        inputs.use_jinja = true;
-        inputs.enable_thinking = false;
-        const auto params = common_chat_templates_apply(g_chat_templates.get(), inputs);
-        const std::string formatted = params.prompt.str();
-        if (!formatted.empty()) {
-            return formatted;
+    const char *raw_tmpl = g_model ? llama_model_chat_template(g_model, nullptr) : nullptr;
+    const bool is_hymt_chat = !raw_tmpl || std::strstr(raw_tmpl, "<｜hy_User｜>") != nullptr;
+    if (!is_hymt_chat && g_chat_templates) {
+        try {
+            common_chat_templates_inputs inputs;
+            common_chat_msg msg;
+            msg.role = "user";
+            msg.content = user_prompt;
+            inputs.messages = {msg};
+            inputs.add_generation_prompt = true;
+            inputs.use_jinja = true;
+            inputs.enable_thinking = false;
+            const auto params = common_chat_templates_apply(g_chat_templates.get(), inputs);
+            const std::string formatted = params.prompt.str();
+            if (!formatted.empty()) {
+                return formatted;
+            }
+        } catch (const std::exception &e) {
+            LOGE("format_hymt_prompt: jinja threw exception: %s", e.what());
+        } catch (...) {
+            LOGE("format_hymt_prompt: jinja threw unknown exception");
         }
     }
-    return std::string("<｜hy_begin▁of▁sentence｜><｜hy_User｜>") + user_prompt + "<｜hy_Assistant｜>";
+    std::string out;
+    out.reserve(67 + user_prompt.size());
+    out += "<｜hy_begin▁of▁sentence｜><｜hy_User｜>";
+    out += user_prompt;
+    out += "<｜hy_Assistant｜>";
+    return out;
 }
 
 } // namespace
@@ -216,11 +238,23 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeLoadModel(
         return JNI_FALSE;
     }
 
+    setenv("KMP_BLOCKTIME", "5", 0);
+
+    const size_t dev_count = ggml_backend_dev_count();
+    for (size_t i = 0; i < dev_count; ++i) {
+        ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+        LOGI("Backend dev[%zu]: name=%s desc=%s", i,
+             ggml_backend_dev_name(dev), ggml_backend_dev_description(dev));
+    }
+
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = kContextSize;
     ctx_params.n_batch = kBatchSize;
     ctx_params.n_ubatch = kBatchSize;
-    const int threads = compute_thread_count();
+    ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
+    ctx_params.no_perf = true;
+    const int threads = std::min(compute_thread_count(), kMaxThreads);
+    LOGI("Context config: threads=%d n_ctx=%d n_batch=%d", threads, kContextSize, kBatchSize);
     ctx_params.n_threads = threads;
     ctx_params.n_threads_batch = threads;
 
@@ -233,6 +267,19 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeLoadModel(
 
     g_chat_templates = common_chat_templates_init(g_model, "");
     g_loaded_model_path = model_path;
+
+    // Warm up mmap weight pages & graph workspace with a 1-token decode pass at load time
+    const llama_vocab *vocab = llama_model_get_vocab(g_model);
+    const llama_token bos_tok = vocab ? llama_vocab_bos(vocab) : LLAMA_TOKEN_NULL;
+    if (bos_tok != LLAMA_TOKEN_NULL) {
+        common_batch warm_batch(g_context);
+        warm_batch.clear();
+        warm_batch.add(bos_tok, 0, 0, true);
+        llama_process(g_context, LLAMA_PROCESS_TYPE_DECODE, warm_batch.get());
+        llama_memory_clear(llama_get_memory(g_context), false);
+    }
+    g_cached_tokens.clear();
+
     LOGI("Model ready (%d threads, ctx=%d)", threads, kContextSize);
     return JNI_TRUE;
 }
@@ -278,59 +325,121 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeTranslateBytes(
     std::string raw_prompt(cprompt);
     env->ReleaseStringUTFChars(jprompt, cprompt);
 
-    llama_memory_clear(llama_get_memory(g_context), true);
+    struct TranslatePerfGuard {
+        std::chrono::steady_clock::time_point t_start = std::chrono::steady_clock::now();
+        std::chrono::steady_clock::time_point t_after_prefill{};
+        int prompt_tokens = 0;
+        size_t cached_tokens = 0;
+        int gen_tokens = 0;
+        size_t out_bytes = 0;
+        const char *stop_reason = "unknown";
+        ~TranslatePerfGuard() {
+            const auto t_end = std::chrono::steady_clock::now();
+            const auto t_mid = (t_after_prefill.time_since_epoch().count() > 0) ? t_after_prefill : t_end;
+            const double prefill_ms = std::chrono::duration<double, std::milli>(t_mid - t_start).count();
+            const double decode_ms = std::chrono::duration<double, std::milli>(t_end - t_mid).count();
+            const double decode_tps = decode_ms > 0.0 ? (gen_tokens * 1000.0 / decode_ms) : 0.0;
+            const int eval_prompt = std::max(0, prompt_tokens - static_cast<int>(cached_tokens));
+            LOGI("TranslatePerf: promptTok=%d (cached=%zu eval=%d) genTok=%d prefill=%.1fms decode=%.1fms (%.1f t/s) stop=%s bytes=%zu",
+                 prompt_tokens, cached_tokens, eval_prompt, gen_tokens, prefill_ms, decode_ms, decode_tps, stop_reason, out_bytes);
+        }
+    } perf_guard;
 
     const std::string formatted = format_hymt_prompt(raw_prompt);
     const std::string bos_str = "<｜hy_begin▁of▁sentence｜>";
     const bool has_bos_prefix = formatted.rfind(bos_str, 0) == 0;
 
     llama_tokens tokens = common_tokenize(g_context, formatted, !has_bos_prefix, true);
-    const int n_ctx = static_cast<int>(llama_n_ctx(g_context));
-    if (tokens.empty() || static_cast<int>(tokens.size()) >= n_ctx - 32) {
-        LOGW("Prompt tokens (%zu) exceed safe context (%d), trimming", tokens.size(), n_ctx);
-        if (static_cast<int>(tokens.size()) >= n_ctx - 32) {
-            tokens.resize(n_ctx - 64);
-        }
-    }
-
-    common_batch batch(g_context);
-    if (!decode_tokens(g_context, batch, tokens)) {
-        LOGE("Prompt decode failed");
+    if (tokens.empty()) {
+        perf_guard.stop_reason = "empty_prompt";
         return nullptr;
     }
+    const int n_ctx = static_cast<int>(llama_n_ctx(g_context));
+    if (static_cast<int>(tokens.size()) >= n_ctx - 32) {
+        LOGW("Prompt tokens (%zu) exceed safe context (%d), trimming", tokens.size(), n_ctx);
+        tokens.resize(n_ctx - 64);
+    }
+    perf_guard.prompt_tokens = static_cast<int>(tokens.size());
+
+    llama_memory_t mem = llama_get_memory(g_context);
+    size_t lcp = 0;
+    if (!g_cached_tokens.empty() && llama_memory_seq_pos_max(mem, 0) >= 0) {
+        const size_t limit = std::min(g_cached_tokens.size(), tokens.size() - 1);
+        while (lcp < limit && g_cached_tokens[lcp] == tokens[lcp]) {
+            ++lcp;
+        }
+    } else {
+        g_cached_tokens.clear();
+    }
+    if (lcp == 0) {
+        llama_memory_clear(mem, false);
+    } else if (!llama_memory_seq_rm(mem, 0, static_cast<llama_pos>(lcp), -1)) {
+        llama_memory_clear(mem, false);
+        lcp = 0;
+        g_cached_tokens.clear();
+    }
+    perf_guard.cached_tokens = lcp;
+
+    common_batch batch(g_context);
+    if (!decode_tokens(g_context, batch, tokens, lcp)) {
+        g_cached_tokens.clear();
+        llama_memory_clear(mem, false);
+        perf_guard.stop_reason = g_cancel_requested.load() ? "cancelled_prefill" : "prefill_error";
+        LOGE("Prompt decode failed (%s)", perf_guard.stop_reason);
+        return nullptr;
+    }
+    g_cached_tokens = tokens;
+    perf_guard.t_after_prefill = std::chrono::steady_clock::now();
 
     common_params_sampling sparams;
-    sparams.temp = temperature;
+    sparams.temp = (temperature <= 0.05f) ? 0.0f : temperature;
     sparams.top_k = 20;
     sparams.top_p = 0.6f;
     sparams.min_p = 0.0f;
     sparams.penalty_repeat = 1.05f;
     common_sampler *sampler = common_sampler_init(g_model, sparams);
     if (!sampler) {
+        perf_guard.stop_reason = "sampler_error";
         LOGE("Failed to init sampler");
         return nullptr;
     }
 
     const llama_vocab *vocab = llama_model_get_vocab(g_model);
+    const llama_token eos_tok = llama_vocab_eos(vocab);
+    const llama_token eot_tok = llama_vocab_eot(vocab);
     std::ostringstream output;
     std::string pending_utf8;
 
     int cur_pos = static_cast<int>(tokens.size());
     const int max_gen = std::min(static_cast<int>(max_tokens), std::max(32, n_ctx - cur_pos - 4));
 
+    perf_guard.stop_reason = "max_tokens";
     for (int step = 0; step < max_gen; ++step) {
         if (g_cancel_requested.load()) {
+            perf_guard.stop_reason = "cancelled";
             break;
         }
 
         const llama_token tok = common_sampler_sample(sampler, g_context, -1);
         common_sampler_accept(sampler, tok, true);
 
-        if (llama_vocab_is_eog(vocab, tok)) {
+        if (llama_vocab_is_eog(vocab, tok) ||
+            (eos_tok != LLAMA_TOKEN_NULL && tok == eos_tok) ||
+            (eot_tok != LLAMA_TOKEN_NULL && tok == eot_tok)) {
+            perf_guard.stop_reason = "eog";
             break;
         }
 
         const std::string piece = common_token_to_piece(g_context, tok, false);
+        if (piece.empty()) {
+            const std::string special_piece = common_token_to_piece(g_context, tok, true);
+            if (special_piece.rfind("<｜hy_", 0) == 0 || special_piece == "<|endoftext|>") {
+                perf_guard.stop_reason = "special_eog";
+                break;
+            }
+        }
+        ++perf_guard.gen_tokens;
+
         pending_utf8 += piece;
         if (is_valid_utf8(pending_utf8)) {
             output << pending_utf8;
@@ -342,12 +451,16 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeTranslateBytes(
         cur_pos += 1;
         if (llama_process(g_context, LLAMA_PROCESS_TYPE_DECODE, batch.get()) != 0) {
             LOGE("Token generation decode failed at step %d", step);
+            g_cached_tokens.clear();
+            llama_memory_clear(mem, false);
+            perf_guard.stop_reason = "decode_error";
             break;
         }
     }
 
     common_sampler_free(sampler);
     const std::string result = output.str();
+    perf_guard.out_bytes = result.size();
     const jsize len = static_cast<jsize>(result.size());
     jbyteArray arr = env->NewByteArray(len);
     if (arr != nullptr && len > 0) {

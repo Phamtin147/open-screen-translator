@@ -14,8 +14,6 @@ import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
-import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -67,8 +65,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGrantOverlay: MaterialButton
     private lateinit var btnToggleService: MaterialButton
 
-    private lateinit var dropdownSourceLang: AutoCompleteTextView
-    private lateinit var dropdownTargetLang: AutoCompleteTextView
+    private lateinit var btnSourceLanguagePicker: LinearLayout
+    private lateinit var tvSourceLangCode: TextView
+    private lateinit var tvSourceLangName: TextView
+    private lateinit var btnTargetLanguagePicker: LinearLayout
+    private lateinit var tvTargetLangCode: TextView
+    private lateinit var tvTargetLangName: TextView
     private lateinit var btnSwapLanguages: ImageButton
 
     private lateinit var rowEngineHymt: LinearLayout
@@ -177,8 +179,12 @@ class MainActivity : AppCompatActivity() {
         btnGrantOverlay = findViewById(R.id.btnGrantOverlay)
         btnToggleService = findViewById(R.id.btnToggleService)
 
-        dropdownSourceLang = findViewById(R.id.dropdownSourceLang)
-        dropdownTargetLang = findViewById(R.id.dropdownTargetLang)
+        btnSourceLanguagePicker = findViewById(R.id.btnSourceLanguagePicker)
+        tvSourceLangCode = findViewById(R.id.tvSourceLangCode)
+        tvSourceLangName = findViewById(R.id.tvSourceLangName)
+        btnTargetLanguagePicker = findViewById(R.id.btnTargetLanguagePicker)
+        tvTargetLangCode = findViewById(R.id.tvTargetLangCode)
+        tvTargetLangName = findViewById(R.id.tvTargetLangName)
         btnSwapLanguages = findViewById(R.id.btnSwapLanguages)
 
         rowEngineHymt = findViewById(R.id.rowEngineHymt)
@@ -285,26 +291,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupLanguageControls() {
-        val itemLayout = com.google.android.material.R.layout.mtrl_auto_complete_simple_item
-        val sourceOptions = AppLanguages.SOURCE_OPTIONS
-        val targetOptions = AppLanguages.TARGET_OPTIONS
-        val srcAdapter = ArrayAdapter(this, itemLayout, sourceOptions.map { it.labelVi })
-        val tgtAdapter = ArrayAdapter(this, itemLayout, targetOptions.map { it.labelVi })
-        dropdownSourceLang.setAdapter(srcAdapter)
-        dropdownTargetLang.setAdapter(tgtAdapter)
+        syncLanguageSelectionUi()
 
-        syncLanguageDropdownTexts()
-
-        dropdownSourceLang.setOnItemClickListener { _, _, position, _ ->
-            prefs.sourceLanguage = sourceOptions[position].code
-            refreshMlKitStatusUi()
-            updateActiveSummaryLine()
+        btnSourceLanguagePicker.setOnClickListener {
+            LanguagePickerSheet.show(
+                context = this,
+                title = "Chọn ngôn ngữ gốc",
+                subtitle = "Nên để Tự phát hiện nếu 1 trang truyện có nhiều thứ tiếng cùng lúc.",
+                options = AppLanguages.SOURCE_OPTIONS,
+                selectedCode = prefs.sourceLanguage
+            ) { selected ->
+                prefs.sourceLanguage = selected.code
+                syncLanguageSelectionUi()
+                refreshMlKitStatusUi()
+                updateActiveSummaryLine()
+            }
         }
 
-        dropdownTargetLang.setOnItemClickListener { _, _, position, _ ->
-            prefs.targetLanguage = targetOptions[position].code
-            refreshMlKitStatusUi()
-            updateActiveSummaryLine()
+        btnTargetLanguagePicker.setOnClickListener {
+            LanguagePickerSheet.show(
+                context = this,
+                title = "Chọn ngôn ngữ đích",
+                subtitle = "Ngôn ngữ hiển thị trên thẻ dịch nổi.",
+                options = AppLanguages.TARGET_OPTIONS,
+                selectedCode = prefs.targetLanguage
+            ) { selected ->
+                prefs.targetLanguage = selected.code
+                syncLanguageSelectionUi()
+                refreshMlKitStatusUi()
+                updateActiveSummaryLine()
+            }
         }
 
         btnSwapLanguages.setOnClickListener {
@@ -325,19 +341,21 @@ class MainActivity : AppCompatActivity() {
                 prefs.sourceLanguage = currentTgt
                 prefs.targetLanguage = currentSrc
             }
-            syncLanguageDropdownTexts()
+            syncLanguageSelectionUi()
             refreshMlKitStatusUi()
             updateActiveSummaryLine()
         }
     }
 
-    private fun syncLanguageDropdownTexts() {
+    private fun syncLanguageSelectionUi() {
         val sourceOptions = AppLanguages.SOURCE_OPTIONS
         val targetOptions = AppLanguages.TARGET_OPTIONS
-        val srcIdx = sourceOptions.indexOfFirst { it.code == prefs.sourceLanguage }.let { if (it >= 0) it else 0 }
-        val tgtIdx = targetOptions.indexOfFirst { it.code == prefs.targetLanguage }.let { if (it >= 0) it else 0 }
-        dropdownSourceLang.setText(sourceOptions[srcIdx].labelVi, false)
-        dropdownTargetLang.setText(targetOptions[tgtIdx].labelVi, false)
+        val srcOpt = sourceOptions.firstOrNull { it.code == prefs.sourceLanguage } ?: sourceOptions.first()
+        val tgtOpt = targetOptions.firstOrNull { it.code == prefs.targetLanguage } ?: targetOptions.first()
+        tvSourceLangCode.text = srcOpt.shortCode
+        tvSourceLangName.text = srcOpt.labelVi
+        tvTargetLangCode.text = tgtOpt.shortCode
+        tvTargetLangName.text = tgtOpt.labelVi
     }
 
     private fun setupEngineDeck() {

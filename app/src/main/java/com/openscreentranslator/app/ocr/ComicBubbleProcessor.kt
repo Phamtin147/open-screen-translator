@@ -338,11 +338,11 @@ object ComicBubbleProcessor {
     }
 
     private fun isMeaningfulText(text: String, box: RectBox, comicModeEnabled: Boolean): Boolean {
-        if (text.isBlank()) return false
-        if (PURE_NOISE_REGEX.matches(text)) return false
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        if (PURE_NOISE_REGEX.matches(trimmed)) return false
+        if (com.openscreentranslator.app.translation.TranslationBatchHelper.shouldSkipTranslation(trimmed)) return false
         if (comicModeEnabled && (box.width < 8 || box.height < 8)) return false
-        // Filter single non-alphanumeric symbol or stray page-edge digit noise smaller than tiny text
-        if (text.length == 1 && !text[0].isLetterOrDigit()) return false
         return true
     }
 

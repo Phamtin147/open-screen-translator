@@ -113,9 +113,7 @@ class TranslationManager(private val appContext: Context? = null) {
 
                 val translations = translateBlocksWithHymt(
                     blocks = blocks,
-                    sourceLang = sourceLang,
-                    targetLang = targetLang,
-                    wholePageContextEnabled = wholePageContextEnabled
+                    targetLang = targetLang
                 )
                 PageTranslationResult(translations, AppPreferences.ENGINE_HY_MT2)
             }
@@ -202,11 +200,10 @@ class TranslationManager(private val appContext: Context? = null) {
 
         when (engineMode) {
             AppPreferences.ENGINE_HY_MT2 -> {
+                if (TranslationBatchHelper.shouldSkipTranslation(text)) return@withContext text
                 val context = appContext
                 if (context != null && HymtEngineHolder.ensureLoaded(context, preferredHymtVariant)) {
-                    val prompt = TranslationBatchHelper.buildSingleHymtPrompt(text, targetLang)
-                    val out = LlamaBridge.nativeTranslate(prompt, 320, 0.3f)
-                    val cleaned = TranslationBatchHelper.cleanSingleOutput(out.orEmpty())
+                    val cleaned = translateSingleHymtSegment(text, targetLang)
                     if (cleaned.isNotBlank()) return@withContext cleaned
                 }
                 translateSingleMlKitOrCloud(text, sourceLang, targetLang)
@@ -224,112 +221,40 @@ class TranslationManager(private val appContext: Context? = null) {
         }
     }
 
+    private fun translateSingleHymtSegment(text: String, targetLang: String): String {
+        val normalized = TranslationBatchHelper.normalizeComicTextForHymt(text)
+        if (normalized.isEmpty()) return ""
+        val prompt = TranslationBatchHelper.buildSingleHymtPrompt(normalized, targetLang)
+        val maxOutTokens = (normalized.length * 2 + 28).coerceIn(32, 200)
+        val raw = LlamaBridge.nativeTranslate(prompt, maxOutTokens, 0.0f).orEmpty()
+        return TranslationBatchHelper.stripRedundantOuterQuotes(
+            sourceText = normalized,
+            translated = TranslationBatchHelper.cleanSingleOutput(raw)
+        )
+    }
+
     private suspend fun translateBlocksWithHymt(
         blocks: List<OcrBlock>,
-        sourceLang: String,
-        targetLang: String,
-        wholePageContextEnabled: Boolean
+        targetLang: String
     ): List<Pair<String, android.graphics.Rect>> {
-        val allTexts = blocks.map { it.text }
-        val pendingIndices = blocks.indices.filter { blocks[it].detectedLanguage != targetLang }
-        if (pendingIndices.isEmpty()) {
+        val hasPendingWork = blocks.any {
+            it.detectedLanguage != targetLang &&
+                !TranslationBatchHelper.shouldSkipTranslation(it.text)
+        }
+        if (!hasPendingWork) {
             return blocks.map { it.text to it.boundingBox }
         }
 
-        if (pendingIndices.size == 1 || !wholePageContextEnabled) {
-            return blocks.map { block ->
-                coroutineContext.ensureActive()
-                if (block.detectedLanguage == targetLang) {
-                    block.text to block.boundingBox
-                } else {
-                    val prompt = if (wholePageContextEnabled && blocks.size > 1) {
-                        TranslationBatchHelper.buildContextSingleHymtPrompt(block.text, allTexts, targetLang)
-                    } else {
-                        TranslationBatchHelper.buildSingleHymtPrompt(block.text, targetLang)
-                    }
-                    val raw = LlamaBridge.nativeTranslate(prompt, 384, 0.3f)
-                    val cleaned = TranslationBatchHelper.cleanSingleOutput(raw.orEmpty())
-                    (cleaned.ifBlank { block.text }) to block.boundingBox
-                }
-            }
-        }
-
-        // Batch sequentially in character-bounded chunks (<= 6 bubbles and <= 550 chars) for fast mobile CPU decoding
-        val resolved = MutableList<String?>(blocks.size) { idx ->
-            if (blocks[idx].detectedLanguage == targetLang) blocks[idx].text else null
-        }
-        val chunks = mutableListOf<List<Int>>()
-        var curChunk = mutableListOf<Int>()
-        var curChars = 0
-        for (idx in pendingIndices) {
-            val len = blocks[idx].text.length
-            if (curChunk.isNotEmpty() && (curChunk.size >= 6 || curChars + len > 550)) {
-                chunks.add(curChunk)
-                curChunk = mutableListOf()
-                curChars = 0
-            }
-            curChunk.add(idx)
-            curChars += len
-        }
-        if (curChunk.isNotEmpty()) {
-            chunks.add(curChunk)
-        }
-
-        for (chunkIndices in chunks) {
+        // Hy-MT2-1.8B is tuned strictly for single-segment translation; 1-to-1 normalized prompts with
+        // native KV prefix reuse avoid [[B1]] tag-scrambling, cross-bubble leakage, and recovery retries.
+        return blocks.map { block ->
             coroutineContext.ensureActive()
-            if (chunkIndices.size == 1) {
-                val idx = chunkIndices[0]
-                val singlePrompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
-                    sourceText = blocks[idx].text,
-                    pageContextLines = allTexts,
-                    targetLang = targetLang
-                )
-                val maxSingleOut = (blocks[idx].text.length * 2 + 64).coerceIn(64, 280)
-                val out = TranslationBatchHelper.cleanSingleOutput(
-                    LlamaBridge.nativeTranslate(singlePrompt, maxSingleOut, 0.3f).orEmpty()
-                )
-                if (out.isNotBlank()) {
-                    resolved[idx] = out
-                }
+            if (block.detectedLanguage == targetLang || TranslationBatchHelper.shouldSkipTranslation(block.text)) {
+                block.text to block.boundingBox
             } else {
-                val chunkTexts = chunkIndices.map { blocks[it].text }
-                val chunkLangs = chunkIndices.map { blocks[it].detectedLanguage }
-                val prompt = TranslationBatchHelper.buildTaggedBatchPrompt(
-                    bubbles = chunkTexts,
-                    targetLang = targetLang,
-                    sourceLang = sourceLang,
-                    includeContextInstruction = true,
-                    bubbleDetectedLangs = chunkLangs
-                )
-                val maxOutTokens = (chunkTexts.sumOf { it.length } * 3 / 2 + 96).coerceIn(128, 512)
-                val raw = LlamaBridge.nativeTranslate(prompt, maxOutTokens, 0.25f).orEmpty()
-                val parsed = TranslationBatchHelper.parseTaggedBatchResponse(raw, chunkTexts.size)
-                for (i in chunkIndices.indices) {
-                    val item = parsed[i + 1]
-                    if (!item.isNullOrBlank()) {
-                        resolved[chunkIndices[i]] = item
-                    }
-                }
+                val cleaned = translateSingleHymtSegment(block.text, targetLang)
+                (cleaned.ifBlank { block.text }) to block.boundingBox
             }
-        }
-
-        // Recover any bubble omitted from the batch delimiter output using page background context
-        for (i in pendingIndices) {
-            coroutineContext.ensureActive()
-            if (resolved[i].isNullOrBlank()) {
-                val prompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
-                    sourceText = blocks[i].text,
-                    pageContextLines = allTexts,
-                    targetLang = targetLang
-                )
-                val raw = LlamaBridge.nativeTranslate(prompt, 384, 0.3f).orEmpty()
-                val cleaned = TranslationBatchHelper.cleanSingleOutput(raw)
-                resolved[i] = cleaned.ifBlank { blocks[i].text }
-            }
-        }
-
-        return blocks.mapIndexed { idx, block ->
-            (resolved[idx] ?: block.text) to block.boundingBox
         }
     }
 

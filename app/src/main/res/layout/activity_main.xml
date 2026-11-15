@@ -213,73 +213,167 @@
                     android:layout_marginBottom="12dp"
                     android:text="Cặp ngôn ngữ &amp; Bộ dịch AI" />
 
-                <!-- Language Dropdowns + 48dp Swap Button -->
-                <LinearLayout
+                <!-- Language Selectors (Source + Target stacked) + Docked 48dp Swap Button -->
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:id="@+id/layoutLanguageSelectors"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:layout_height="wrap_content">
 
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilSourceLang"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    <LinearLayout
+                        android:id="@+id/btnSourceLanguagePicker"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:hint="Ngôn ngữ gốc"
-                        app:boxBackgroundColor="@color/surface_recessed"
-                        app:boxCornerRadiusBottomEnd="10dp"
-                        app:boxCornerRadiusBottomStart="10dp"
-                        app:boxCornerRadiusTopEnd="10dp"
-                        app:boxCornerRadiusTopStart="10dp"
-                        app:boxStrokeColor="@color/hairline_strong">
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_selector_field"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:minHeight="56dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="10dp"
+                        app:layout_constraintEnd_toStartOf="@id/btnSwapLanguages"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent">
 
-                        <AutoCompleteTextView
-                            android:id="@+id/dropdownSourceLang"
-                            android:layout_width="match_parent"
+                        <TextView
+                            android:id="@+id/tvSourceLangCode"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:inputType="none"
-                            android:minHeight="48dp"
+                            android:background="@drawable/bg_lang_pill_neutral"
+                            android:fontFeatureSettings="tnum"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:minHeight="28dp"
+                            android:minWidth="50dp"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:text="AUTO"
                             android:textColor="@color/ink_primary"
-                            android:textSize="13sp"
-                            tools:ignore="LabelFor" />
-                    </com.google.android.material.textfield.TextInputLayout>
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Ngôn ngữ gốc"
+                                android:textColor="@color/ink_muted"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvSourceLangName"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="1dp"
+                                android:lineSpacingMultiplier="1.1"
+                                android:text="Tự phát hiện (Đa ngôn ngữ)"
+                                android:textColor="@color/ink_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_down" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/btnTargetLanguagePicker"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_selector_field"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground"
+                        android:gravity="center_vertical"
+                        android:minHeight="56dp"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="10dp"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintEnd_toEndOf="@id/btnSourceLanguagePicker"
+                        app:layout_constraintStart_toStartOf="@id/btnSourceLanguagePicker"
+                        app:layout_constraintTop_toBottomOf="@id/btnSourceLanguagePicker">
+
+                        <TextView
+                            android:id="@+id/tvTargetLangCode"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_lang_pill_neutral"
+                            android:fontFeatureSettings="tnum"
+                            android:gravity="center"
+                            android:maxLines="1"
+                            android:minHeight="28dp"
+                            android:minWidth="50dp"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:text="VI"
+                            android:textColor="@color/ink_primary"
+                            android:textSize="11sp"
+                            android:textStyle="bold" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_marginEnd="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Dịch sang"
+                                android:textColor="@color/ink_muted"
+                                android:textSize="11sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/tvTargetLangName"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="1dp"
+                                android:lineSpacingMultiplier="1.1"
+                                android:text="Tiếng Việt (VI)"
+                                android:textColor="@color/ink_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_chevron_down" />
+                    </LinearLayout>
 
                     <ImageButton
                         android:id="@+id/btnSwapLanguages"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:layout_marginHorizontal="8dp"
-                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:background="@drawable/bg_selector_field"
                         android:contentDescription="@string/swap_languages_cd"
+                        android:foreground="?attr/selectableItemBackground"
                         android:padding="12dp"
-                        android:src="@drawable/ic_swap_horiz" />
-
-                    <com.google.android.material.textfield.TextInputLayout
-                        android:id="@+id/tilTargetLang"
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:hint="Dịch sang"
-                        app:boxBackgroundColor="@color/surface_recessed"
-                        app:boxCornerRadiusBottomEnd="10dp"
-                        app:boxCornerRadiusBottomStart="10dp"
-                        app:boxCornerRadiusTopEnd="10dp"
-                        app:boxCornerRadiusTopStart="10dp"
-                        app:boxStrokeColor="@color/hairline_strong">
-
-                        <AutoCompleteTextView
-                            android:id="@+id/dropdownTargetLang"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="none"
-                            android:minHeight="48dp"
-                            android:textColor="@color/ink_primary"
-                            android:textSize="13sp"
-                            tools:ignore="LabelFor" />
-                    </com.google.android.material.textfield.TextInputLayout>
-                </LinearLayout>
+                        android:rotation="90"
+                        android:src="@drawable/ic_swap_horiz"
+                        app:layout_constraintBottom_toBottomOf="@id/btnTargetLanguagePicker"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintTop_toTopOf="@id/btnSourceLanguagePicker" />
+                </androidx.constraintlayout.widget.ConstraintLayout>
 
                 <TextView
                     android:layout_width="wrap_content"

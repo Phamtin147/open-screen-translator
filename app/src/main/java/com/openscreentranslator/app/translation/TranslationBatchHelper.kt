@@ -12,11 +12,134 @@ object TranslationBatchHelper {
 
     fun languageEnglishName(code: String): String = AppLanguages.englishName(code)
 
+    private val URL_OR_HOST_PATH_REGEX =
+        Regex("^(?:https?://\\S+|(?:www\\.)?[a-z0-9-]+(?:\\.[a-z0-9-]+)+(?::\\d+)?/\\S*|[\\w.+-]+@[\\w.-]+\\.[a-z]{2,})$")
+    private val CAPS_PRONOUN_I_REGEX = Regex("(?<![\\p{L}])i(?=(?:'[a-z]{1,2})?(?![\\p{L}]))")
+
+    fun shouldSkipTranslation(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return true
+        val letterCount = trimmed.count { it.isLetter() }
+        if (letterCount == 0) return true
+        if (trimmed.length == 1 && trimmed[0].code < 128) return true
+        val hasDigit = trimmed.any { it.isDigit() }
+        val hasCjkOrHangul = trimmed.any {
+            com.openscreentranslator.app.data.AppLanguages.isKanaChar(it) ||
+                com.openscreentranslator.app.data.AppLanguages.isHanChar(it) ||
+                com.openscreentranslator.app.data.AppLanguages.isHangulChar(it)
+        }
+        // Status bar clocks / signal icons OCR'd as e.g. "9:48 3 M" or "4G"
+        if (!hasCjkOrHangul && hasDigit && letterCount <= 1) return true
+        val tokens = trimmed.split(Regex("\\s+")).filter { it.isNotEmpty() }
+        if (tokens.size == 1) {
+            val tok = tokens[0]
+            if (tok.contains("://") || URL_OR_HOST_PATH_REGEX.matches(tok.lowercase(java.util.Locale.ROOT))) {
+                return true
+            }
+        } else if (tokens.size <= 3) {
+            // Browser URL bar often has 1-2 char address-bar icons before/after the URL (e.g. "O 127.0.0.1:18765/page.html")
+            val nonIconTokens = tokens.filter { it.length > 2 || it.contains('.') || it.contains('/') }
+            if (nonIconTokens.size == 1) {
+                val urlCandidate = nonIconTokens[0]
+                if (urlCandidate.contains("://") ||
+                    URL_OR_HOST_PATH_REGEX.matches(urlCandidate.lowercase(java.util.Locale.ROOT))
+                ) {
+                    return true
+                }
+            }
+        }
+        return false
+    }
+
+    private fun isCjkNoSpaceChar(ch: Char): Boolean {
+        if (com.openscreentranslator.app.data.AppLanguages.isKanaChar(ch) ||
+            com.openscreentranslator.app.data.AppLanguages.isHanChar(ch)
+        ) {
+            return true
+        }
+        return ch in charArrayOf('。', '、', '！', '？', '…', '「', '」', '『', '』', '（', '）', '【', '】', 'ー', '〜')
+    }
+
+    fun normalizeComicTextForHymt(rawText: String): String {
+        val lines = rawText.replace("\r\n", "\n").replace('\r', '\n')
+            .split('\n')
+            .map { it.replace(Regex("\\s+"), " ").trim() }
+            .filter { it.isNotEmpty() }
+        if (lines.isEmpty()) return ""
+
+        val joinedBuilder = StringBuilder()
+        for (line in lines) {
+            if (joinedBuilder.isEmpty()) {
+                joinedBuilder.append(line)
+            } else {
+                val prevLast = joinedBuilder[joinedBuilder.length - 1]
+                val nextFirst = line[0]
+                val bothCjkNoSpace = isCjkNoSpaceChar(prevLast) && isCjkNoSpaceChar(nextFirst)
+                if (bothCjkNoSpace) {
+                    joinedBuilder.append(line)
+                } else {
+                    joinedBuilder.append(' ').append(line)
+                }
+            }
+        }
+        val collapsed = joinedBuilder.toString().replace(Regex(" {2,}"), " ").trim()
+
+        // Normalize ALL-CAPS English/Latin comic dialogue to natural sentence case so 1.8B BPE translates idioms accurately
+        var latinCount = 0
+        var lowerCount = 0
+        for (ch in collapsed) {
+            if (ch.isLetter() &&
+                !com.openscreentranslator.app.data.AppLanguages.isKanaChar(ch) &&
+                !com.openscreentranslator.app.data.AppLanguages.isHanChar(ch) &&
+                !com.openscreentranslator.app.data.AppLanguages.isHangulChar(ch)
+            ) {
+                latinCount++
+                if (ch.isLowerCase()) lowerCount++
+            }
+        }
+        if (latinCount >= 6 && lowerCount == 0 && collapsed.count { it == ' ' } >= 1) {
+            val lowered = collapsed.lowercase(java.util.Locale.ROOT)
+            val withPronounI = CAPS_PRONOUN_I_REGEX.replace(lowered) { "I" }
+            var firstCharDone = false
+            val sb = StringBuilder(withPronounI.length)
+            var capitalizeNext = true
+            for (ch in withPronounI) {
+                if (ch.isLetter()) {
+                    sb.append(if (capitalizeNext || !firstCharDone) ch.titlecaseChar() else ch)
+                    firstCharDone = true
+                    capitalizeNext = false
+                } else {
+                    sb.append(ch)
+                    if (ch == '.' || ch == '!' || ch == '?') {
+                        capitalizeNext = true
+                    }
+                }
+            }
+            return sb.toString()
+        }
+        return collapsed
+    }
+
+    fun stripRedundantOuterQuotes(sourceText: String, translated: String): String {
+        val trimmed = translated.trim()
+        if (trimmed.length < 2) return trimmed
+        val pairs = listOf('"' to '"', '“' to '”', '\'' to '\'', '«' to '»')
+        val srcTrimmed = sourceText.trim()
+        for ((open, close) in pairs) {
+            if (trimmed.first() == open && trimmed.last() == close) {
+                val srcQuoted = srcTrimmed.firstOrNull() == open && srcTrimmed.lastOrNull() == close
+                if (!srcQuoted) {
+                    return trimmed.substring(1, trimmed.length - 1).trim()
+                }
+            }
+        }
+        return trimmed
+    }
+
     fun buildSingleHymtPrompt(sourceText: String, targetLang: String): String {
         val targetName = languageEnglishName(targetLang)
-        return "Translate the following text into $targetName. " +
-            "Note that you should only output the translated result without any additional explanation:\n\n" +
-            sourceText
+        val normalized = normalizeComicTextForHymt(sourceText)
+        return "Translate the following segment into $targetName, without additional explanation.\n\n$normalized"
     }
 
     fun buildGeminiSinglePrompt(
