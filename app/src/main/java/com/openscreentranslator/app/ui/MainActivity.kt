@@ -387,6 +387,18 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (ModelManager.isModelInstalled(this, variantId)) {
+                val curEngine = HymtEngineHolder.engineState.value
+                if (curEngine is HymtEngineState.Loading) {
+                    showNotice("Model đang được nạp vào RAM, vui lòng đợi vài giây...")
+                    return@setOnClickListener
+                }
+                if (curEngine is HymtEngineState.Ready && curEngine.variantId == variantId) {
+                    selectEngine(AppPreferences.ENGINE_HY_MT2)
+                    refreshHymtStatusUi()
+                    showNotice("Model ${ModelManager.findVariant(variantId).quantLabel} đã nạp sẵn và đang được chọn!")
+                    return@setOnClickListener
+                }
+
                 // Pre-warm GGUF in background thread so first screen tap is instant
                 btnDownloadOrLoadModel.isEnabled = false
                 btnDownloadOrLoadModel.text = "Đang nạp vào RAM..."
@@ -394,10 +406,14 @@ class MainActivity : AppCompatActivity() {
                     val ok = withContext(Dispatchers.IO) {
                         HymtEngineHolder.ensureLoaded(this@MainActivity, variantId)
                     }
-                    btnDownloadOrLoadModel.isEnabled = true
-                    showNotice(
-                        if (ok) "Đã nạp Hy-MT2-1.8B vào bộ nhớ sẵn sàng!" else "Không thể nạp model GGUF."
-                    )
+                    if (ok) {
+                        selectEngine(AppPreferences.ENGINE_HY_MT2)
+                        showNotice("Đã nạp xong Hy-MT2-1.8B vào RAM và sẵn sàng dịch!")
+                    } else {
+                        val err = (HymtEngineHolder.engineState.value as? HymtEngineState.Error)?.message
+                            ?: "Không thể nạp model GGUF."
+                        showNotice(err)
+                    }
                     refreshHymtStatusUi()
                 }
             } else {
@@ -428,9 +444,14 @@ class MainActivity : AppCompatActivity() {
         val dlState = ModelManager.downloadState.value
         val engineState = HymtEngineHolder.engineState.value
 
+        val isLoadingSelected = engineState is HymtEngineState.Loading
+        val isReadySelected = engineState is HymtEngineState.Ready && engineState.variantId == selected.id
+
         tvHymtEngineTag.text = when {
             dlState is ModelDownloadState.Downloading -> "ĐANG TẢI"
-            engineState is HymtEngineState.Ready && engineState.variantId == selected.id -> "ĐANG NẠP"
+            isLoadingSelected -> "ĐANG NẠP..."
+            isReadySelected -> "ĐÃ NẠP"
+            engineState is HymtEngineState.Error && installed -> "LỖI NẠP"
             installed -> "SẴN SÀNG"
             anyInstalled != null -> anyInstalled.quantLabel
             else -> "CHƯA TẢI"
@@ -439,13 +460,20 @@ class MainActivity : AppCompatActivity() {
         tvHymtEngineTag.setTextColor(
             ContextCompat.getColor(
                 this,
-                if (installed || anyInstalled != null) R.color.status_active else R.color.ink_muted
+                when {
+                    isLoadingSelected -> R.color.status_warning
+                    engineState is HymtEngineState.Error && installed -> R.color.accent_vermilion_text
+                    isReadySelected || installed || anyInstalled != null -> R.color.status_active
+                    else -> R.color.ink_muted
+                }
             )
         )
 
         val statusSuffix = when {
-            engineState is HymtEngineState.Ready && engineState.variantId == selected.id -> "Đã nạp vào RAM · Sẵn sàng dịch"
-            installed -> "Đã lưu trên máy · Offline 100%"
+            isLoadingSelected -> "Đang nạp vào RAM (vui lòng đợi)..."
+            isReadySelected -> "Đã nạp vào RAM · Sẵn sàng dịch"
+            engineState is HymtEngineState.Error && installed -> "Lỗi nạp: ${engineState.message}"
+            installed -> "Đã lưu trên máy · Bấm nút dưới để nạp vào RAM"
             else -> "Chưa tải · Cần kết nối Wi-Fi để tải 1 lần"
         }
         tvModelVariantDesc.text = "${selected.summaryVi}\nTrạng thái: $statusSuffix"
@@ -478,17 +506,18 @@ class MainActivity : AppCompatActivity() {
             else -> {
                 layoutDownloadProgress.visibility = View.GONE
                 if (installed) {
-                    btnDownloadOrLoadModel.text = if (engineState is HymtEngineState.Ready && engineState.variantId == selected.id) {
-                        "Đã nạp sẵn (${selected.quantLabel})"
-                    } else {
-                        "Nạp trước vào RAM (${selected.quantLabel})"
+                    btnDownloadOrLoadModel.text = when {
+                        isLoadingSelected -> "Đang nạp vào RAM..."
+                        isReadySelected -> "Đã nạp & Sẵn sàng dùng (${selected.quantLabel})"
+                        else -> "Nạp vào RAM để dùng (${selected.quantLabel})"
                     }
-                    btnDeleteModel.visibility = View.VISIBLE
+                    btnDownloadOrLoadModel.isEnabled = !isLoadingSelected
+                    btnDeleteModel.visibility = if (isLoadingSelected) View.GONE else View.VISIBLE
                 } else {
                     btnDownloadOrLoadModel.text = "Tải ${selected.quantLabel} (${selected.approxSizeMb} MB)"
+                    btnDownloadOrLoadModel.isEnabled = true
                     btnDeleteModel.visibility = View.GONE
                 }
-                btnDownloadOrLoadModel.isEnabled = true
             }
         }
     }

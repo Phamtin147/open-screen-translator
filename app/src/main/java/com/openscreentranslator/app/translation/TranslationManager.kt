@@ -220,15 +220,29 @@ class TranslationManager(private val appContext: Context? = null) {
             }
         }
 
-        // Batch sequentially in chunks of up to 8 untranslated bubbles so n_ctx=2048 stays sharp and fast
+        // Batch sequentially in character-bounded chunks (<= 6 bubbles and <= 550 chars) for fast mobile CPU decoding
         val resolved = MutableList<String?>(blocks.size) { idx ->
             if (blocks[idx].detectedLanguage == targetLang) blocks[idx].text else null
         }
-        val chunkSize = 8
-        var offset = 0
-        while (offset < pendingIndices.size) {
+        val chunks = mutableListOf<List<Int>>()
+        var curChunk = mutableListOf<Int>()
+        var curChars = 0
+        for (idx in pendingIndices) {
+            val len = blocks[idx].text.length
+            if (curChunk.isNotEmpty() && (curChunk.size >= 6 || curChars + len > 550)) {
+                chunks.add(curChunk)
+                curChunk = mutableListOf()
+                curChars = 0
+            }
+            curChunk.add(idx)
+            curChars += len
+        }
+        if (curChunk.isNotEmpty()) {
+            chunks.add(curChunk)
+        }
+
+        for (chunkIndices in chunks) {
             coroutineContext.ensureActive()
-            val chunkIndices = pendingIndices.subList(offset, minOf(offset + chunkSize, pendingIndices.size))
             if (chunkIndices.size == 1) {
                 val idx = chunkIndices[0]
                 val singlePrompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
@@ -236,8 +250,9 @@ class TranslationManager(private val appContext: Context? = null) {
                     pageContextLines = allTexts,
                     targetLang = targetLang
                 )
+                val maxSingleOut = (blocks[idx].text.length * 2 + 64).coerceIn(64, 280)
                 val out = TranslationBatchHelper.cleanSingleOutput(
-                    LlamaBridge.nativeTranslate(singlePrompt, 384, 0.3f).orEmpty()
+                    LlamaBridge.nativeTranslate(singlePrompt, maxSingleOut, 0.3f).orEmpty()
                 )
                 if (out.isNotBlank()) {
                     resolved[idx] = out
@@ -252,7 +267,7 @@ class TranslationManager(private val appContext: Context? = null) {
                     includeContextInstruction = true,
                     bubbleDetectedLangs = chunkLangs
                 )
-                val maxOutTokens = (chunkTexts.sumOf { it.length } * 2 + 128).coerceIn(256, 1024)
+                val maxOutTokens = (chunkTexts.sumOf { it.length } * 3 / 2 + 96).coerceIn(128, 512)
                 val raw = LlamaBridge.nativeTranslate(prompt, maxOutTokens, 0.25f).orEmpty()
                 val parsed = TranslationBatchHelper.parseTaggedBatchResponse(raw, chunkTexts.size)
                 for (i in chunkIndices.indices) {
@@ -262,7 +277,6 @@ class TranslationManager(private val appContext: Context? = null) {
                     }
                 }
             }
-            offset += chunkSize
         }
 
         // Recover any bubble omitted from the batch delimiter output using page background context
