@@ -56,9 +56,11 @@ class TranslationManager(private val appContext: Context? = null) {
     private val networkSemaphore = Semaphore(6)
 
     private val httpClient = OkHttpClient.Builder()
+        .dns(ResilientDns)
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
 
     private fun shouldSkipAsAlreadyTarget(block: OcrBlock, targetLang: String): Boolean {

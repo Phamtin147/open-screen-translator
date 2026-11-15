@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,10 +15,16 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.EOFException
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLException
 
 data class HymtModelVariant(
     val id: String,
@@ -83,10 +90,12 @@ object ModelManager {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val httpClient = OkHttpClient.Builder()
+        .dns(ResilientDns)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val _downloadState = MutableStateFlow<ModelDownloadState>(ModelDownloadState.Idle)
@@ -156,16 +165,33 @@ object ModelManager {
         }
 
         activeDownloadJob = scope.launch {
-            try {
-                downloadWithResume(appContext, variant, partFile)
-            } catch (e: CancellationException) {
-                _downloadState.value = ModelDownloadState.Idle
-            } catch (e: Exception) {
-                _downloadState.value = ModelDownloadState.Error(
-                    variant.id,
-                    e.message ?: "Lỗi kết nối khi tải model từ Hugging Face."
-                )
+            val maxAttempts = 3
+            var lastError: Exception? = null
+            for (attempt in 1..maxAttempts) {
+                if (!isActive) return@launch
+                try {
+                    downloadWithResume(appContext, variant, partFile)
+                    return@launch
+                } catch (e: CancellationException) {
+                    _downloadState.value = ModelDownloadState.Idle
+                    return@launch
+                } catch (e: Exception) {
+                    lastError = e
+                    val shouldRetry = attempt < maxAttempts && isTransientNetworkError(e) && isActive
+                    if (!shouldRetry) break
+                    // Clear stale DoH cache before retry in case Wi-Fi/carrier DNS switched mid-transfer.
+                    ResilientDns.clearCache()
+                    delay(1200L * attempt)
+                }
             }
+            if (!isActive) {
+                _downloadState.value = ModelDownloadState.Idle
+                return@launch
+            }
+            _downloadState.value = ModelDownloadState.Error(
+                variant.id,
+                formatDownloadError(lastError)
+            )
         }
     }
 
@@ -320,5 +346,32 @@ object ModelManager {
         } catch (_: Exception) {
             false
         }
+    }
+
+    private fun isTransientNetworkError(error: Throwable): Boolean {
+        var cur: Throwable? = error
+        while (cur != null) {
+            if (cur is UnknownHostException ||
+                cur is SocketTimeoutException ||
+                cur is ConnectException ||
+                cur is SocketException ||
+                cur is SSLException ||
+                cur is EOFException
+            ) {
+                return true
+            }
+            cur = cur.cause
+        }
+        return false
+    }
+
+    private fun formatDownloadError(error: Exception?): String {
+        if (error == null) return "Lỗi kết nối khi tải model từ Hugging Face."
+        val isDnsFailure = generateSequence<Throwable>(error) { it.cause }
+            .any { it is UnknownHostException }
+        if (isDnsFailure) {
+            return "Không phân giải được tên miền tải model (đã thử DNS máy và 1.1.1.1 / 8.8.8.8). Hãy kiểm tra Wi-Fi/4G hoặc tắt VPN/AdGuard rồi thử lại.\n(${error.message})"
+        }
+        return error.message ?: "Lỗi kết nối khi tải model từ Hugging Face."
     }
 }
