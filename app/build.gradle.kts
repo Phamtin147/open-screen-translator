@@ -84,14 +84,14 @@ dependencies {
     // ML Kit Language Identification
     implementation("com.google.mlkit:language-id:17.0.4")
     
-    // Google Play Services Base
+    // Google Play Services Base (needed for Tasks)
     implementation("com.google.android.gms:play-services-base:18.3.0")
 
-    // ML Kit Text Recognition (OCR) via Google Play Services (Thin APK)
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-japanese:16.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-korean:16.0.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition-chinese:16.0.1")
+    // ML Kit Text Recognition (OCR) Bundled Models (100% offline instant on first tap, no GMS hang)
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("com.google.mlkit:text-recognition-japanese:16.0.1")
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+    implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     
     // ML Kit On-Device Translation
     implementation("com.google.mlkit:translate:17.0.2")

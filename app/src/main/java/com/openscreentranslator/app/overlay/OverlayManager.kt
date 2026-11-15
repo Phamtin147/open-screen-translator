@@ -125,14 +125,14 @@ class OverlayManager(
     fun setBubbleLoading(loading: Boolean) {
         handler.post {
             bubbleButton?.apply {
-                isEnabled = !loading
+                isEnabled = true
                 setImageResource(
                     if (loading) R.drawable.ic_translate_active else R.drawable.ic_translate
                 )
                 setBackgroundResource(
                     if (loading) R.drawable.bubble_background_active else R.drawable.bubble_background
                 )
-                alpha = if (loading) 0.96f else 1.0f
+                alpha = if (loading) 0.88f else 1.0f
             }
         }
     }
@@ -240,8 +240,11 @@ class OverlayManager(
                     true
                 }
 
-                windowManager.addView(tv, params)
-                translationCards.add(tv)
+                try {
+                    windowManager.addView(tv, params)
+                    translationCards.add(tv)
+                } catch (_: Exception) {
+                }
             }
 
             val autoClearSec = prefs.autoClearSeconds

@@ -218,8 +218,8 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeCancel(
 }
 
 extern "C"
-JNIEXPORT jstring JNICALL
-Java_com_openscreentranslator_app_translation_LlamaBridge_nativeTranslate(
+JNIEXPORT jbyteArray JNICALL
+Java_com_openscreentranslator_app_translation_LlamaBridge_nativeTranslateBytes(
         JNIEnv *env,
         jobject /*thiz*/,
         jstring jprompt,
@@ -308,7 +308,13 @@ Java_com_openscreentranslator_app_translation_LlamaBridge_nativeTranslate(
     }
 
     common_sampler_free(sampler);
-    return env->NewStringUTF(output.str().c_str());
+    const std::string result = output.str();
+    const jsize len = static_cast<jsize>(result.size());
+    jbyteArray arr = env->NewByteArray(len);
+    if (arr != nullptr && len > 0) {
+        env->SetByteArrayRegion(arr, 0, len, reinterpret_cast<const jbyte *>(result.data()));
+    }
+    return arr;
 }
 
 extern "C"

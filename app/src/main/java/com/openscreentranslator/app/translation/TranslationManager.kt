@@ -14,8 +14,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -24,6 +28,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -36,10 +42,12 @@ data class PageTranslationResult(
 class TranslationManager(private val appContext: Context? = null) {
     private val TAG = "TranslationManager"
     private val mlKitTranslators = mutableMapOf<String, Translator>()
+    private val networkSemaphore = Semaphore(6)
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .callTimeout(20, TimeUnit.SECONDS)
         .build()
 
     suspend fun translatePageBubbles(
@@ -112,8 +120,14 @@ class TranslationManager(private val appContext: Context? = null) {
             }
 
             AppPreferences.ENGINE_ML_KIT -> {
-                val pairs = translateViaMlKitOrCloud(blocks, sourceLang, targetLang)
-                PageTranslationResult(pairs, AppPreferences.ENGINE_ML_KIT)
+                val fellBackToCloud = AtomicBoolean(false)
+                val pairs = translateViaMlKitOrCloud(blocks, sourceLang, targetLang, fellBackToCloud)
+                val notice = if (fellBackToCloud.get()) {
+                    "Gói offline ML Kit đang tải hoặc chưa sẵn sàng — tạm dịch qua Cloud"
+                } else {
+                    null
+                }
+                PageTranslationResult(pairs, AppPreferences.ENGINE_ML_KIT, fallbackNotice = notice)
             }
 
             else -> {
@@ -128,7 +142,9 @@ class TranslationManager(private val appContext: Context? = null) {
                                 } else {
                                     block.detectedLanguage ?: sourceLang
                                 }
-                                val translated = translateViaFreeCloud(block.text, sl, targetLang)
+                                val translated = networkSemaphore.withPermit {
+                                    translateViaFreeCloud(block.text, sl, targetLang)
+                                }
                                 translated to block.boundingBox
                             }
                         }
@@ -174,7 +190,7 @@ class TranslationManager(private val appContext: Context? = null) {
         }
     }
 
-    private fun translateBlocksWithHymt(
+    private suspend fun translateBlocksWithHymt(
         blocks: List<OcrBlock>,
         sourceLang: String,
         targetLang: String,
@@ -188,6 +204,7 @@ class TranslationManager(private val appContext: Context? = null) {
 
         if (pendingIndices.size == 1 || !wholePageContextEnabled) {
             return blocks.map { block ->
+                coroutineContext.ensureActive()
                 if (block.detectedLanguage == targetLang) {
                     block.text to block.boundingBox
                 } else {
@@ -210,6 +227,7 @@ class TranslationManager(private val appContext: Context? = null) {
         val chunkSize = 8
         var offset = 0
         while (offset < pendingIndices.size) {
+            coroutineContext.ensureActive()
             val chunkIndices = pendingIndices.subList(offset, minOf(offset + chunkSize, pendingIndices.size))
             if (chunkIndices.size == 1) {
                 val idx = chunkIndices[0]
@@ -249,6 +267,7 @@ class TranslationManager(private val appContext: Context? = null) {
 
         // Recover any bubble omitted from the batch delimiter output using page background context
         for (i in pendingIndices) {
+            coroutineContext.ensureActive()
             if (resolved[i].isNullOrBlank()) {
                 val prompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
                     sourceText = blocks[i].text,
@@ -335,7 +354,8 @@ class TranslationManager(private val appContext: Context? = null) {
     private suspend fun translateViaMlKitOrCloud(
         blocks: List<OcrBlock>,
         sourceLang: String,
-        targetLang: String
+        targetLang: String,
+        fellBackToCloud: AtomicBoolean? = null
     ): List<Pair<String, android.graphics.Rect>> = coroutineScope {
         blocks.map { block ->
             async {
@@ -347,7 +367,7 @@ class TranslationManager(private val appContext: Context? = null) {
                 if (effectiveSource == targetLang) {
                     block.text to block.boundingBox
                 } else {
-                    val t = translateSingleMlKitOrCloud(block.text, effectiveSource, targetLang)
+                    val t = translateSingleMlKitOrCloud(block.text, effectiveSource, targetLang, fellBackToCloud)
                     t to block.boundingBox
                 }
             }
@@ -357,24 +377,32 @@ class TranslationManager(private val appContext: Context? = null) {
     private suspend fun translateSingleMlKitOrCloud(
         text: String,
         sourceLang: String,
-        targetLang: String
+        targetLang: String,
+        fellBackToCloud: AtomicBoolean? = null
     ): String {
         if (sourceLang == targetLang) return text
         val mlSource = mapToMlKitLanguage(sourceLang)
         val mlTarget = mapToMlKitLanguage(targetLang)
         if (mlSource == null || mlTarget == null) {
-            return translateViaFreeCloud(
-                text = text,
-                sourceLang = sourceLang.ifBlank { AppLanguages.AUTO },
-                targetLang = targetLang
-            )
+            return networkSemaphore.withPermit {
+                translateViaFreeCloud(
+                    text = text,
+                    sourceLang = sourceLang.ifBlank { AppLanguages.AUTO },
+                    targetLang = targetLang
+                )
+            }
         }
 
         return try {
             translateOnDevice(text, mlSource, mlTarget)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            Log.w(TAG, "ML Kit ($mlSource->$mlTarget) failed, falling back to Cloud Free: ${e.message}")
-            translateViaFreeCloud(text, sourceLang, targetLang)
+            Log.w(TAG, "ML Kit ($mlSource->$mlTarget) failed or timed out, falling back to Cloud Free: ${e.message}")
+            fellBackToCloud?.set(true)
+            networkSemaphore.withPermit {
+                translateViaFreeCloud(text, sourceLang, targetLang)
+            }
         }
     }
 
@@ -396,20 +424,24 @@ class TranslationManager(private val appContext: Context? = null) {
         }
 
         val conditions = DownloadConditions.Builder().build()
-        suspendCancellableCoroutine<Unit> { cont ->
-            translator.downloadModelIfNeeded(conditions)
-                .addOnSuccessListener { if (cont.isActive) cont.resume(Unit) }
-                .addOnFailureListener { e -> if (cont.isActive) cont.resumeWithException(e) }
+        withTimeout(12_000L) {
+            suspendCancellableCoroutine<Unit> { cont ->
+                translator.downloadModelIfNeeded(conditions)
+                    .addOnSuccessListener { if (cont.isActive) cont.resume(Unit) }
+                    .addOnFailureListener { e -> if (cont.isActive) cont.resumeWithException(e) }
+            }
         }
 
-        return suspendCancellableCoroutine { cont ->
-            translator.translate(text)
-                .addOnSuccessListener { result ->
-                    if (cont.isActive) cont.resume(result.ifBlank { text })
-                }
-                .addOnFailureListener { e ->
-                    if (cont.isActive) cont.resumeWithException(e)
-                }
+        return withTimeout(8_000L) {
+            suspendCancellableCoroutine { cont ->
+                translator.translate(text)
+                    .addOnSuccessListener { result ->
+                        if (cont.isActive) cont.resume(result.ifBlank { text })
+                    }
+                    .addOnFailureListener { e ->
+                        if (cont.isActive) cont.resumeWithException(e)
+                    }
+            }
         }
     }
 

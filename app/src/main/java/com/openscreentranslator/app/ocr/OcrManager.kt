@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Log
 import com.google.android.gms.tasks.Task
-import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.nl.languageid.LanguageIdentification
 import com.google.mlkit.nl.languageid.LanguageIdentificationOptions
 import com.google.mlkit.nl.languageid.LanguageIdentifier
@@ -17,6 +16,17 @@ import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.openscreentranslator.app.data.AppLanguages
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 data class OcrBlock(
     val text: String,
@@ -37,6 +47,7 @@ class OcrManager {
         else -> RecognizerScript.LATIN
     }
 
+    @Synchronized
     private fun getRecognizer(script: RecognizerScript): TextRecognizer {
         return recognizerCache.getOrPut(script) {
             when (script) {
@@ -48,6 +59,7 @@ class OcrManager {
         }
     }
 
+    @Synchronized
     private fun getLanguageIdentifier(): LanguageIdentifier {
         val current = languageIdentifier
         if (current != null) return current
@@ -60,38 +72,52 @@ class OcrManager {
         return created
     }
 
-    fun processImage(
+    suspend fun processImage(
         bitmap: Bitmap,
         languageCode: String,
         comicModeEnabled: Boolean = true,
-        readingDirection: ReadingDirection = ReadingDirection.MANGA_RTL,
-        onSuccess: (List<OcrBlock>) -> Unit,
-        onError: (Exception) -> Unit
-    ) {
-        val inputImage = InputImage.fromBitmap(bitmap, 0)
+        readingDirection: ReadingDirection = ReadingDirection.MANGA_RTL
+    ): List<OcrBlock> = withContext(Dispatchers.Default) {
+        val origWidth = bitmap.width
+        val origHeight = bitmap.height
+        if (origWidth <= 0 || origHeight <= 0) return@withContext emptyList()
 
-        if (languageCode == AppLanguages.AUTO) {
-            processAutoMultiScript(
-                inputImage = inputImage,
-                comicModeEnabled = comicModeEnabled,
-                readingDirection = readingDirection,
-                onSuccess = onSuccess,
-                onError = onError
-            )
-            return
+        // Cap oversized screenshots (e.g. tall 22:9 displays like 1080x2640) for fast, low-RAM OCR
+        val scale = min(1f, min(1080f / origWidth.toFloat(), 2048f / origHeight.toFloat()))
+        val ocrBitmap = if (scale < 0.98f) {
+            val targetW = (origWidth * scale).roundToInt().coerceAtLeast(1)
+            val targetH = (origHeight * scale).roundToInt().coerceAtLeast(1)
+            Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
+        } else {
+            bitmap
         }
 
-        val script = scriptForLanguage(languageCode)
-        getRecognizer(script).process(inputImage)
-            .addOnSuccessListener { visionText ->
-                val rawBlocks = toRawOcrBlocks(visionText, script)
+        val scaleBackX = origWidth.toFloat() / ocrBitmap.width.toFloat()
+        val scaleBackY = origHeight.toFloat() / ocrBitmap.height.toFloat()
+
+        try {
+            val inputImage = InputImage.fromBitmap(ocrBitmap, 0)
+            if (languageCode == AppLanguages.AUTO) {
+                processAutoMultiScript(
+                    inputImage = inputImage,
+                    comicModeEnabled = comicModeEnabled,
+                    readingDirection = readingDirection,
+                    scaleBackX = scaleBackX,
+                    scaleBackY = scaleBackY
+                )
+            } else {
+                val script = scriptForLanguage(languageCode)
+                val visionText = awaitTaskWithTimeout(getRecognizer(script).process(inputImage), 10_000L)
+                    ?: return@withContext emptyList()
+
+                val rawBlocks = toRawOcrBlocks(visionText, script, scaleBackX, scaleBackY)
                 val processed = ComicBubbleProcessor.processBlocks(
                     rawBlocks = rawBlocks,
                     sourceLang = languageCode,
                     comicModeEnabled = comicModeEnabled,
                     readingDirection = readingDirection
                 )
-                val resultList = processed.map { bubble ->
+                processed.map { bubble ->
                     OcrBlock(
                         text = bubble.text,
                         boundingBox = bubble.box.toAndroidRect(),
@@ -99,117 +125,123 @@ class OcrManager {
                         detectedLanguage = languageCode
                     )
                 }
-                onSuccess(resultList)
             }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "OCR failed for $languageCode", e)
-                onError(e)
+        } finally {
+            if (ocrBitmap !== bitmap && !ocrBitmap.isRecycled) {
+                ocrBitmap.recycle()
             }
+        }
     }
 
-    private fun processAutoMultiScript(
+    private suspend fun processAutoMultiScript(
         inputImage: InputImage,
         comicModeEnabled: Boolean,
         readingDirection: ReadingDirection,
-        onSuccess: (List<OcrBlock>) -> Unit,
-        onError: (Exception) -> Unit
-    ) {
+        scaleBackX: Float,
+        scaleBackY: Float
+    ): List<OcrBlock> {
         val scripts = listOf(
             RecognizerScript.LATIN,
             RecognizerScript.JAPANESE,
             RecognizerScript.KOREAN,
             RecognizerScript.CHINESE
         )
-        val tasks: List<Pair<RecognizerScript, Task<Text>>> = scripts.map { script ->
-            script to getRecognizer(script).process(inputImage)
-        }
 
-        Tasks.whenAllComplete(tasks.map { it.second })
-            .addOnCompleteListener {
-                val allCandidates = mutableListOf<RawOcrBlock>()
-                var firstFailure: Exception? = null
-                var succeededCount = 0
-
-                for ((script, task) in tasks) {
-                    if (task.isSuccessful) {
-                        succeededCount++
-                        val visionText = task.result
+        val perScriptBlocks = coroutineScope {
+            scripts.map { script ->
+                async(Dispatchers.Default) {
+                    try {
+                        val visionText = awaitTaskWithTimeout(getRecognizer(script).process(inputImage), 10_000L)
                         if (visionText != null) {
-                            allCandidates.addAll(toRawOcrBlocks(visionText, script))
+                            toRawOcrBlocks(visionText, script, scaleBackX, scaleBackY)
+                        } else {
+                            Log.w(TAG, "Auto OCR script $script timed out")
+                            emptyList()
                         }
-                    } else {
-                        val err = task.exception
-                        if (err != null && firstFailure == null) {
-                            firstFailure = err
-                        }
-                        Log.w(TAG, "Auto OCR script $script failed: ${err?.message}")
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Auto OCR script $script failed: ${e.message}")
+                        emptyList()
                     }
                 }
+            }.awaitAll()
+        }
 
-                if (succeededCount == 0 && firstFailure != null) {
-                    onError(firstFailure)
-                    return@addOnCompleteListener
-                }
+        val allCandidates = perScriptBlocks.flatten()
+        if (allCandidates.isEmpty()) return emptyList()
 
-                val fusedRaw = ComicBubbleProcessor.mergeCrossScriptCandidates(allCandidates)
-                val processed = ComicBubbleProcessor.processBlocks(
-                    rawBlocks = fusedRaw,
-                    sourceLang = AppLanguages.AUTO,
-                    comicModeEnabled = comicModeEnabled,
-                    readingDirection = readingDirection
-                )
+        val fusedRaw = ComicBubbleProcessor.mergeCrossScriptCandidates(allCandidates)
+        val processed = ComicBubbleProcessor.processBlocks(
+            rawBlocks = fusedRaw,
+            sourceLang = AppLanguages.AUTO,
+            comicModeEnabled = comicModeEnabled,
+            readingDirection = readingDirection
+        )
 
-                resolveBubbleLanguages(processed, onSuccess)
-            }
+        return resolveBubbleLanguages(processed)
     }
 
-    private fun resolveBubbleLanguages(
-        processed: List<ProcessedBubble>,
-        onSuccess: (List<OcrBlock>) -> Unit
-    ) {
-        if (processed.isEmpty()) {
-            onSuccess(emptyList())
-            return
-        }
+    private suspend fun resolveBubbleLanguages(
+        processed: List<ProcessedBubble>
+    ): List<OcrBlock> {
+        if (processed.isEmpty()) return emptyList()
 
         val needsLangIdIndices = processed.indices.filter { processed[it].detectedLang == null }
         if (needsLangIdIndices.isEmpty()) {
-            onSuccess(
-                processed.map { bubble ->
-                    OcrBlock(
-                        text = bubble.text,
-                        boundingBox = bubble.box.toAndroidRect(),
-                        orderIndex = bubble.orderIndex,
-                        detectedLanguage = bubble.detectedLang
-                    )
-                }
-            )
-            return
+            return processed.map { bubble ->
+                OcrBlock(
+                    text = bubble.text,
+                    boundingBox = bubble.box.toAndroidRect(),
+                    orderIndex = bubble.orderIndex,
+                    detectedLanguage = bubble.detectedLang
+                )
+            }
         }
 
         val identifier = getLanguageIdentifier()
-        val idTasks = needsLangIdIndices.associateWith { idx ->
-            identifier.identifyLanguage(processed[idx].text)
+        val detectedByIdx = coroutineScope {
+            needsLangIdIndices.map { idx ->
+                async(Dispatchers.Default) {
+                    val tag = try {
+                        awaitTaskWithTimeout(identifier.identifyLanguage(processed[idx].text), 2_500L)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    idx to AppLanguages.normalizeDetectedTag(tag)
+                }
+            }.awaitAll().toMap()
         }
 
-        Tasks.whenAllComplete(idTasks.values.toList())
-            .addOnCompleteListener {
-                val results = processed.mapIndexed { idx, bubble ->
-                    val detected = bubble.detectedLang ?: idTasks[idx]?.let { task ->
-                        if (task.isSuccessful) AppLanguages.normalizeDetectedTag(task.result) else null
-                    }
-                    OcrBlock(
-                        text = bubble.text,
-                        boundingBox = bubble.box.toAndroidRect(),
-                        orderIndex = bubble.orderIndex,
-                        detectedLanguage = detected
-                    )
-                }
-                onSuccess(results)
-            }
+        return processed.mapIndexed { idx, bubble ->
+            val detected = bubble.detectedLang ?: detectedByIdx[idx]
+            OcrBlock(
+                text = bubble.text,
+                boundingBox = bubble.box.toAndroidRect(),
+                orderIndex = bubble.orderIndex,
+                detectedLanguage = detected
+            )
+        }
     }
 
-    private fun toRawOcrBlocks(visionText: Text, script: RecognizerScript): List<RawOcrBlock> {
+    private suspend fun <T> awaitTaskWithTimeout(task: Task<T>, timeoutMs: Long): T? {
+        return withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine { cont ->
+                task.addOnSuccessListener { result ->
+                    if (cont.isActive) cont.resume(result)
+                }.addOnFailureListener { err ->
+                    if (cont.isActive) cont.resumeWithException(err)
+                }.addOnCanceledListener {
+                    if (cont.isActive) cont.cancel()
+                }
+            }
+        }
+    }
+
+    private fun toRawOcrBlocks(
+        visionText: Text,
+        script: RecognizerScript,
+        scaleBackX: Float,
+        scaleBackY: Float
+    ): List<RawOcrBlock> {
         return visionText.textBlocks.mapNotNull { block ->
             val box = block.boundingBox ?: return@mapNotNull null
             val rawText = block.text.trim()
@@ -218,17 +250,18 @@ class OcrManager {
             val lines = block.lines.mapNotNull inner@{ line ->
                 val lineBox = line.boundingBox ?: return@inner null
                 val lineText = line.text.trim()
-                if (lineText.isBlank()) null else OcrLine(lineText, lineBox.toRectBox())
+                if (lineText.isBlank()) null else OcrLine(lineText, lineBox.toScaledRectBox(scaleBackX, scaleBackY))
             }
             RawOcrBlock(
                 text = rawText,
-                box = box.toRectBox(),
+                box = box.toScaledRectBox(scaleBackX, scaleBackY),
                 lines = lines,
                 scriptHint = script
             )
         }
     }
 
+    @Synchronized
     fun close() {
         recognizerCache.values.forEach { it.close() }
         recognizerCache.clear()
@@ -236,7 +269,12 @@ class OcrManager {
         languageIdentifier = null
     }
 
-    private fun Rect.toRectBox(): RectBox = RectBox(left, top, right, bottom)
+    private fun Rect.toScaledRectBox(sx: Float, sy: Float): RectBox = RectBox(
+        left = (left * sx).roundToInt(),
+        top = (top * sy).roundToInt(),
+        right = (right * sx).roundToInt(),
+        bottom = (bottom * sy).roundToInt()
+    )
 
     private fun RectBox.toAndroidRect(): Rect = Rect(left, top, right, bottom)
 }

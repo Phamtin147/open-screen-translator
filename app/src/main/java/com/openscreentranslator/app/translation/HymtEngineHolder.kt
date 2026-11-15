@@ -32,7 +32,7 @@ object HymtEngineHolder {
             return false
         }
 
-        if (loadedVariantId == installed.id && LlamaBridge.nativeIsModelLoaded()) {
+        if (loadedVariantId == installed.id && LlamaBridge.isLoadedSafe()) {
             _engineState.value = HymtEngineState.Ready(installed.id, installed.displayName)
             return true
         }
@@ -57,7 +57,7 @@ object HymtEngineHolder {
     }
 
     fun unload() {
-        LlamaBridge.nativeUnloadModel()
+        LlamaBridge.unloadIfLoaded()
         loadedVariantId = null
         _engineState.value = HymtEngineState.Unloaded
     }
