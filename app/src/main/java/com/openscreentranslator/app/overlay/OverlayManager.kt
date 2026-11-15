@@ -17,6 +17,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.util.DisplayMetrics
+import android.util.Log
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -34,16 +35,20 @@ class OverlayManager(
     private val context: Context,
     private val onBubbleClick: () -> Unit
 ) {
+    private val TAG = "OverlayManager"
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val prefs = AppPreferences(context)
 
     private var bubbleView: View? = null
     private var bubbleButton: ImageButton? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
+    private var dismissBackdropView: View? = null
+    private var statusPillView: TextView? = null
     private val translationCards = mutableListOf<View>()
 
     private val handler = Handler(Looper.getMainLooper())
     private val autoClearRunnable = Runnable { clearTranslationCards() }
+    private val hideStatusRunnable = Runnable { hideStatusPillImmediate() }
 
     private val layoutType: Int
         get() = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -110,13 +115,23 @@ class OverlayManager(
             }
         })
 
-        windowManager.addView(bubbleView, bubbleParams)
+        try {
+            windowManager.addView(bubbleView, bubbleParams)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to attach floating bubble", e)
+            bubbleView = null
+            bubbleButton = null
+        }
     }
 
     fun removeFloatingBubble() {
         clearTranslationCards()
-        bubbleView?.let {
-            windowManager.removeView(it)
+        hideStatusPillImmediate()
+        bubbleView?.let { view ->
+            try {
+                windowManager.removeView(view)
+            } catch (_: Exception) {
+            }
             bubbleView = null
             bubbleButton = null
         }
@@ -137,19 +152,105 @@ class OverlayManager(
         }
     }
 
+    fun showStatusPill(message: String, autoHideMs: Long = 0L) {
+        handler.post {
+            handler.removeCallbacks(hideStatusRunnable)
+            val pill = statusPillView ?: TextView(createThemedOverlayContext()).apply {
+                setTextColor(Color.parseColor("#F4F7FB"))
+                textSize = 12.5f
+                fontFeatureSettings = "tnum"
+                gravity = Gravity.CENTER
+                maxLines = 2
+                setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dpToPx(20).toFloat()
+                    setColor(Color.parseColor("#EB091326"))
+                    setStroke(dpToPx(1), Color.parseColor("#D8C7A8"))
+                }
+            }.also { created ->
+                val params = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    layoutType,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                    PixelFormat.TRANSLUCENT
+                ).apply {
+                    gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                    y = dpToPx(42)
+                }
+                try {
+                    windowManager.addView(created, params)
+                    statusPillView = created
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to show status pill", e)
+                    return@post
+                }
+            }
+
+            pill.text = message
+            if (autoHideMs > 0L) {
+                handler.postDelayed(hideStatusRunnable, autoHideMs)
+            }
+        }
+    }
+
+    fun hideStatusPill() {
+        handler.post { hideStatusPillImmediate() }
+    }
+
+    private fun hideStatusPillImmediate() {
+        handler.removeCallbacks(hideStatusRunnable)
+        statusPillView?.let { pill ->
+            try {
+                windowManager.removeView(pill)
+            } catch (_: Exception) {
+            }
+            statusPillView = null
+        }
+    }
+
     fun drawTranslationCards(
         results: List<Pair<String, Rect>>,
         showBubbleOrderIndex: Boolean = prefs.comicModeEnabled && results.size > 1
     ) {
         handler.post {
             clearTranslationCardsImmediate()
-            if (results.isEmpty()) return@post
+            val nonBlankResults = results.filter { it.first.isNotBlank() }
+            if (nonBlankResults.isEmpty()) {
+                hideStatusPillImmediate()
+                return@post
+            }
 
+            hideStatusPillImmediate()
             val themedCtx = createThemedOverlayContext()
             val (screenW, screenH) = currentScreenBounds()
             val safeMargin = dpToPx(8)
             val topMargin = dpToPx(24)
             val bottomMargin = dpToPx(48)
+
+            // Full-screen transparent backdrop so tapping ANYWHERE on screen dismisses translation cards
+            // even when cards overlap or hide the floating bubble button.
+            val backdrop = View(themedCtx).apply {
+                setBackgroundColor(Color.argb(14, 8, 17, 33))
+                setOnClickListener { clearTranslationCards() }
+            }
+            val backdropParams = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            try {
+                windowManager.addView(backdrop, backdropParams)
+                dismissBackdropView = backdrop
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to attach tap-anywhere dismiss backdrop", e)
+                dismissBackdropView = null
+            }
 
             val alphaPercent = prefs.overlayOpacity.coerceIn(65, 100)
             val bgAlpha = (alphaPercent * 255) / 100
@@ -161,8 +262,7 @@ class OverlayManager(
             val badgeColor = ContextCompat.getColor(themedCtx, R.color.overlay_badge_bg)
             val bgColorWithAlpha = ColorUtils.setAlphaComponent(baseBgColor, bgAlpha)
 
-            results.forEachIndexed { idx, (translatedText, rect) ->
-                if (translatedText.isBlank()) return@forEachIndexed
+            nonBlankResults.forEachIndexed { idx, (translatedText, rect) ->
 
                 val tv = TextView(themedCtx).apply {
                     setTextColor(textColor)
@@ -193,13 +293,13 @@ class OverlayManager(
                     }
                 }
 
-                // Expand narrow vertical CJK speech bubbles horizontally so Vietnamese text reads cleanly
+                // Expand narrow vertical CJK speech bubbles and allow slight width breathing room for Vietnamese text
                 val maxAllowedWidth = (screenW - safeMargin * 2).coerceAtLeast(dpToPx(120))
                 val isVerticalBubble = rect.height() > rect.width() * 1.35f
                 val targetWidth = if (isVerticalBubble) {
                     maxOf(rect.width(), dpToPx(188)).coerceAtMost(maxAllowedWidth)
                 } else {
-                    maxOf(rect.width(), dpToPx(104)).coerceAtMost(maxAllowedWidth)
+                    maxOf((rect.width() * 1.18f).toInt(), dpToPx(112)).coerceAtMost(maxAllowedWidth)
                 }
 
                 // Estimate height for safe vertical clamping within viewport
@@ -235,16 +335,28 @@ class OverlayManager(
                     clearTranslationCards()
                 }
                 tv.setOnLongClickListener {
-                    windowManager.removeView(tv)
+                    try {
+                        windowManager.removeView(tv)
+                    } catch (_: Exception) {
+                    }
                     translationCards.remove(tv)
+                    if (translationCards.isEmpty()) {
+                        clearTranslationCardsImmediate()
+                    }
                     true
                 }
 
                 try {
                     windowManager.addView(tv, params)
                     translationCards.add(tv)
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to attach translation card #$idx", e)
                 }
+            }
+
+            if (translationCards.isEmpty()) {
+                clearTranslationCardsImmediate()
+                return@post
             }
 
             val autoClearSec = prefs.autoClearSeconds
@@ -268,6 +380,13 @@ class OverlayManager(
             } catch (_: Exception) {
             }
             iterator.remove()
+        }
+        dismissBackdropView?.let { backdrop ->
+            try {
+                windowManager.removeView(backdrop)
+            } catch (_: Exception) {
+            }
+            dismissBackdropView = null
         }
     }
 

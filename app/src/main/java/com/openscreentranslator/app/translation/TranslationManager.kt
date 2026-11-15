@@ -2,24 +2,30 @@ package com.openscreentranslator.app.translation
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.tasks.Task
 import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
 import com.openscreentranslator.app.data.AppLanguages
 import com.openscreentranslator.app.data.AppPreferences
 import com.openscreentranslator.app.ocr.OcrBlock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -27,6 +33,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.coroutineContext
@@ -39,9 +46,13 @@ data class PageTranslationResult(
     val fallbackNotice: String? = null
 )
 
+private class MlKitTimeoutException(message: String) : IllegalStateException(message)
+
 class TranslationManager(private val appContext: Context? = null) {
     private val TAG = "TranslationManager"
     private val mlKitTranslators = mutableMapOf<String, Translator>()
+    private val mlKitPairMutexes = mutableMapOf<String, Mutex>()
+    private val readyMlKitPairs = ConcurrentHashMap.newKeySet<String>()
     private val networkSemaphore = Semaphore(6)
 
     private val httpClient = OkHttpClient.Builder()
@@ -49,6 +60,14 @@ class TranslationManager(private val appContext: Context? = null) {
         .readTimeout(15, TimeUnit.SECONDS)
         .callTimeout(20, TimeUnit.SECONDS)
         .build()
+
+    private fun shouldSkipAsAlreadyTarget(block: OcrBlock, targetLang: String): Boolean {
+        if (block.detectedLanguage != targetLang) return false
+        if (targetLang == "vi" && !AppLanguages.hasVietnameseDiacritics(block.text) && block.text.length <= 20) {
+            return false
+        }
+        return true
+    }
 
     suspend fun translatePageBubbles(
         blocks: List<OcrBlock>,
@@ -70,7 +89,7 @@ class TranslationManager(private val appContext: Context? = null) {
             )
         }
 
-        if (blocks.all { it.detectedLanguage == targetLang }) {
+        if (blocks.all { shouldSkipAsAlreadyTarget(it, targetLang) }) {
             return@withContext PageTranslationResult(
                 blocks.map { it.text to it.boundingBox },
                 engineMode
@@ -121,20 +140,30 @@ class TranslationManager(private val appContext: Context? = null) {
 
             AppPreferences.ENGINE_ML_KIT -> {
                 val fellBackToCloud = AtomicBoolean(false)
-                val pairs = translateViaMlKitOrCloud(blocks, sourceLang, targetLang, fellBackToCloud)
-                val notice = if (fellBackToCloud.get()) {
-                    "Gói offline ML Kit đang tải hoặc chưa sẵn sàng — tạm dịch qua Cloud"
-                } else {
-                    null
+                val cloudFailedOffline = AtomicBoolean(false)
+                val pairs = translateViaMlKitOrCloud(
+                    blocks = blocks,
+                    sourceLang = sourceLang,
+                    targetLang = targetLang,
+                    fellBackToCloud = fellBackToCloud,
+                    cloudFailedOffline = cloudFailedOffline
+                )
+                val notice = when {
+                    cloudFailedOffline.get() ->
+                        "Gói offline ML Kit chưa sẵn & không có mạng — bấm 'Tải gói offline' trong app trước"
+                    fellBackToCloud.get() ->
+                        "Gói offline ML Kit chưa sẵn — đã tạm dịch qua Google Cloud"
+                    else -> null
                 }
                 PageTranslationResult(pairs, AppPreferences.ENGINE_ML_KIT, fallbackNotice = notice)
             }
 
             else -> {
+                val cloudFailedOffline = AtomicBoolean(false)
                 val pairs = coroutineScope {
                     blocks.map { block ->
                         async {
-                            if (block.detectedLanguage == targetLang) {
+                            if (shouldSkipAsAlreadyTarget(block, targetLang)) {
                                 block.text to block.boundingBox
                             } else {
                                 val sl = if (sourceLang == AppLanguages.AUTO) {
@@ -143,14 +172,17 @@ class TranslationManager(private val appContext: Context? = null) {
                                     block.detectedLanguage ?: sourceLang
                                 }
                                 val translated = networkSemaphore.withPermit {
-                                    translateViaFreeCloud(block.text, sl, targetLang)
+                                    translateViaFreeCloud(block.text, sl, targetLang, cloudFailedOffline)
                                 }
                                 translated to block.boundingBox
                             }
                         }
                     }.awaitAll()
                 }
-                PageTranslationResult(pairs, AppPreferences.ENGINE_CLOUD_FREE)
+                val notice = if (cloudFailedOffline.get()) {
+                    "Không kết nối được Google Translate Cloud — kiểm tra Wi-Fi/4G"
+                } else null
+                PageTranslationResult(pairs, AppPreferences.ENGINE_CLOUD_FREE, fallbackNotice = notice)
             }
         }
     }
@@ -369,19 +401,26 @@ class TranslationManager(private val appContext: Context? = null) {
         blocks: List<OcrBlock>,
         sourceLang: String,
         targetLang: String,
-        fellBackToCloud: AtomicBoolean? = null
+        fellBackToCloud: AtomicBoolean? = null,
+        cloudFailedOffline: AtomicBoolean? = null
     ): List<Pair<String, android.graphics.Rect>> = coroutineScope {
         blocks.map { block ->
             async {
-                val effectiveSource = when {
-                    !block.detectedLanguage.isNullOrBlank() -> block.detectedLanguage
-                    sourceLang != AppLanguages.AUTO -> sourceLang
-                    else -> AppLanguages.AUTO
-                }
-                if (effectiveSource == targetLang) {
+                if (shouldSkipAsAlreadyTarget(block, targetLang)) {
                     block.text to block.boundingBox
                 } else {
-                    val t = translateSingleMlKitOrCloud(block.text, effectiveSource, targetLang, fellBackToCloud)
+                    val effectiveSource = when {
+                        !block.detectedLanguage.isNullOrBlank() -> block.detectedLanguage
+                        sourceLang != AppLanguages.AUTO -> sourceLang
+                        else -> AppLanguages.AUTO
+                    }
+                    val t = translateSingleMlKitOrCloud(
+                        text = block.text,
+                        sourceLang = effectiveSource,
+                        targetLang = targetLang,
+                        fellBackToCloud = fellBackToCloud,
+                        cloudFailedOffline = cloudFailedOffline
+                    )
                     t to block.boundingBox
                 }
             }
@@ -392,7 +431,8 @@ class TranslationManager(private val appContext: Context? = null) {
         text: String,
         sourceLang: String,
         targetLang: String,
-        fellBackToCloud: AtomicBoolean? = null
+        fellBackToCloud: AtomicBoolean? = null,
+        cloudFailedOffline: AtomicBoolean? = null
     ): String {
         if (sourceLang == targetLang) return text
         val mlSource = mapToMlKitLanguage(sourceLang)
@@ -402,20 +442,21 @@ class TranslationManager(private val appContext: Context? = null) {
                 translateViaFreeCloud(
                     text = text,
                     sourceLang = sourceLang.ifBlank { AppLanguages.AUTO },
-                    targetLang = targetLang
+                    targetLang = targetLang,
+                    cloudFailedOffline = cloudFailedOffline
                 )
             }
         }
 
         return try {
             translateOnDevice(text, mlSource, mlTarget)
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "ML Kit ($mlSource->$mlTarget) failed or timed out, falling back to Cloud Free: ${e.message}")
             fellBackToCloud?.set(true)
             networkSemaphore.withPermit {
-                translateViaFreeCloud(text, sourceLang, targetLang)
+                translateViaFreeCloud(text, sourceLang, targetLang, cloudFailedOffline)
             }
         }
     }
@@ -426,6 +467,7 @@ class TranslationManager(private val appContext: Context? = null) {
         mlTarget: String
     ): String {
         val key = "$mlSource-$mlTarget"
+        coroutineContext.ensureActive()
 
         val translator = synchronized(mlKitTranslators) {
             mlKitTranslators.getOrPut(key) {
@@ -437,26 +479,34 @@ class TranslationManager(private val appContext: Context? = null) {
             }
         }
 
-        val conditions = DownloadConditions.Builder().build()
-        withTimeout(12_000L) {
-            suspendCancellableCoroutine<Unit> { cont ->
-                translator.downloadModelIfNeeded(conditions)
-                    .addOnSuccessListener { if (cont.isActive) cont.resume(Unit) }
-                    .addOnFailureListener { e -> if (cont.isActive) cont.resumeWithException(e) }
+        if (!readyMlKitPairs.contains(key)) {
+            val pairMutex = synchronized(mlKitPairMutexes) {
+                mlKitPairMutexes.getOrPut(key) { Mutex() }
+            }
+            pairMutex.withLock {
+                if (!readyMlKitPairs.contains(key)) {
+                    val conditions = DownloadConditions.Builder().build()
+                    val downloaded = withTimeoutOrNull(14_000L) {
+                        awaitTask(translator.downloadModelIfNeeded(conditions))
+                        true
+                    }
+                    coroutineContext.ensureActive()
+                    if (downloaded != true) {
+                        throw MlKitTimeoutException("ML Kit download timed out for $key")
+                    }
+                    readyMlKitPairs.add(key)
+                }
             }
         }
 
-        return withTimeout(8_000L) {
-            suspendCancellableCoroutine { cont ->
-                translator.translate(text)
-                    .addOnSuccessListener { result ->
-                        if (cont.isActive) cont.resume(result.ifBlank { text })
-                    }
-                    .addOnFailureListener { e ->
-                        if (cont.isActive) cont.resumeWithException(e)
-                    }
-            }
+        val translated = withTimeoutOrNull(10_000L) {
+            awaitTask(translator.translate(text))
         }
+        coroutineContext.ensureActive()
+        if (translated == null) {
+            throw MlKitTimeoutException("ML Kit translate timed out for $key")
+        }
+        return translated.ifBlank { text }
     }
 
     private fun translateViaGeminiSingle(
@@ -525,7 +575,12 @@ class TranslationManager(private val appContext: Context? = null) {
         return null
     }
 
-    private fun translateViaFreeCloud(text: String, sourceLang: String, targetLang: String): String {
+    private fun translateViaFreeCloud(
+        text: String,
+        sourceLang: String,
+        targetLang: String,
+        cloudFailedOffline: AtomicBoolean? = null
+    ): String {
         return try {
             val encodedText = URLEncoder.encode(text, "UTF-8")
             val sl = sourceLang.ifBlank { AppLanguages.AUTO }
@@ -536,7 +591,10 @@ class TranslationManager(private val appContext: Context? = null) {
                 .build()
 
             httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return text
+                if (!response.isSuccessful) {
+                    cloudFailedOffline?.set(true)
+                    return text
+                }
                 val responseBody = response.body?.string() ?: return text
                 val jsonArray = JSONArray(responseBody)
                 val sentencesArray = jsonArray.getJSONArray(0)
@@ -549,31 +607,8 @@ class TranslationManager(private val appContext: Context? = null) {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Free Cloud translation error", e)
+            cloudFailedOffline?.set(true)
             text
-        }
-    }
-
-    private fun mapToMlKitLanguage(code: String): String? {
-        if (code.isBlank() || code == AppLanguages.AUTO) return null
-        return when (code.lowercase()) {
-            "vi" -> TranslateLanguage.VIETNAMESE
-            "en" -> TranslateLanguage.ENGLISH
-            "ja" -> TranslateLanguage.JAPANESE
-            "ko" -> TranslateLanguage.KOREAN
-            "zh" -> TranslateLanguage.CHINESE
-            "fr" -> TranslateLanguage.FRENCH
-            "de" -> TranslateLanguage.GERMAN
-            "es" -> TranslateLanguage.SPANISH
-            "pt" -> TranslateLanguage.PORTUGUESE
-            "id" -> TranslateLanguage.INDONESIAN
-            "it" -> TranslateLanguage.ITALIAN
-            "nl" -> TranslateLanguage.DUTCH
-            "pl" -> TranslateLanguage.POLISH
-            "tr" -> TranslateLanguage.TURKISH
-            "ru" -> TranslateLanguage.RUSSIAN
-            "th" -> TranslateLanguage.THAI
-            "ar" -> TranslateLanguage.ARABIC
-            else -> TranslateLanguage.fromLanguageTag(code)
         }
     }
 
@@ -581,6 +616,102 @@ class TranslationManager(private val appContext: Context? = null) {
         synchronized(mlKitTranslators) {
             mlKitTranslators.values.forEach { it.close() }
             mlKitTranslators.clear()
+        }
+        readyMlKitPairs.clear()
+    }
+
+    companion object {
+        fun mapToMlKitLanguage(code: String): String? {
+            if (code.isBlank() || code == AppLanguages.AUTO) return null
+            return when (code.lowercase()) {
+                "vi" -> TranslateLanguage.VIETNAMESE
+                "en" -> TranslateLanguage.ENGLISH
+                "ja" -> TranslateLanguage.JAPANESE
+                "ko" -> TranslateLanguage.KOREAN
+                "zh" -> TranslateLanguage.CHINESE
+                "fr" -> TranslateLanguage.FRENCH
+                "de" -> TranslateLanguage.GERMAN
+                "es" -> TranslateLanguage.SPANISH
+                "pt" -> TranslateLanguage.PORTUGUESE
+                "id" -> TranslateLanguage.INDONESIAN
+                "it" -> TranslateLanguage.ITALIAN
+                "nl" -> TranslateLanguage.DUTCH
+                "pl" -> TranslateLanguage.POLISH
+                "tr" -> TranslateLanguage.TURKISH
+                "ru" -> TranslateLanguage.RUSSIAN
+                "th" -> TranslateLanguage.THAI
+                "ar" -> TranslateLanguage.ARABIC
+                else -> TranslateLanguage.fromLanguageTag(code)
+            }
+        }
+
+        private suspend fun <T> awaitTask(task: Task<T>): T {
+            return suspendCancellableCoroutine { cont ->
+                task.addOnSuccessListener { result ->
+                    if (cont.isActive) cont.resume(result)
+                }.addOnFailureListener { err ->
+                    if (cont.isActive) cont.resumeWithException(err)
+                }.addOnCanceledListener {
+                    if (cont.isActive) cont.cancel()
+                }
+            }
+        }
+
+        suspend fun listDownloadedMlKitCodes(): Set<String> = withContext(Dispatchers.IO) {
+            try {
+                val models = awaitTask(
+                    RemoteModelManager.getInstance().getDownloadedModels(TranslateRemoteModel::class.java)
+                )
+                models.map { it.language.lowercase() }.toSet()
+            } catch (e: Exception) {
+                Log.w("TranslationManager", "Failed to query ML Kit models", e)
+                emptySet()
+            }
+        }
+
+        suspend fun downloadMlKitLanguages(
+            appCodes: List<String>,
+            onProgress: (done: Int, total: Int, code: String) -> Unit = { _, _, _ -> }
+        ): Result<Set<String>> = withContext(Dispatchers.IO) {
+            val mlCodes = appCodes.mapNotNull { mapToMlKitLanguage(it) }.distinct()
+            if (mlCodes.isEmpty()) return@withContext Result.success(emptySet())
+
+            val remoteManager = RemoteModelManager.getInstance()
+            val conditions = DownloadConditions.Builder().build()
+            val already = try {
+                awaitTask(remoteManager.getDownloadedModels(TranslateRemoteModel::class.java))
+                    .map { it.language.lowercase() }
+                    .toSet()
+            } catch (_: Exception) {
+                emptySet()
+            }
+
+            val missing = mlCodes.filter { it.lowercase() !in already }
+            if (missing.isEmpty()) {
+                return@withContext Result.success(already)
+            }
+
+            return@withContext try {
+                missing.forEachIndexed { idx, mlCode ->
+                    coroutineContext.ensureActive()
+                    onProgress(idx + 1, missing.size, mlCode)
+                    val model = TranslateRemoteModel.Builder(mlCode).build()
+                    val ok = withTimeoutOrNull(90_000L) {
+                        awaitTask(remoteManager.download(model, conditions))
+                        true
+                    }
+                    coroutineContext.ensureActive()
+                    if (ok != true) {
+                        throw MlKitTimeoutException("Tải gói ML Kit '$mlCode' bị quá thời gian (kiểm tra mạng)")
+                    }
+                }
+                val updated = listDownloadedMlKitCodes()
+                Result.success(updated)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 }

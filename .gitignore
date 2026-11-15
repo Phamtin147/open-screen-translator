@@ -10,3 +10,6 @@ captures/
 .externalNativeBuild
 .cxx
 third_party/llama.cpp/
+*.jks
+*.keystore
+keystore.properties

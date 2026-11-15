@@ -48,6 +48,7 @@ import com.openscreentranslator.app.translation.HymtEngineHolder
 import com.openscreentranslator.app.translation.HymtEngineState
 import com.openscreentranslator.app.translation.ModelDownloadState
 import com.openscreentranslator.app.translation.ModelManager
+import com.openscreentranslator.app.translation.TranslationManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,6 +92,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutGeminiConfig: LinearLayout
     private lateinit var etGeminiApiKey: TextInputEditText
     private lateinit var tvGetApiKey: TextView
+
+    private lateinit var layoutMlKitConfig: LinearLayout
+    private lateinit var tvMlKitStatus: TextView
+    private lateinit var btnDownloadMlKitPacks: MaterialButton
+    private var isDownloadingMlKitPacks = false
 
     private lateinit var layoutComicModeRow: LinearLayout
     private lateinit var switchComicMode: MaterialSwitch
@@ -145,6 +151,7 @@ class MainActivity : AppCompatActivity() {
         setupLanguageControls()
         setupEngineDeck()
         setupHymtManagerControls()
+        setupMlKitControls()
         setupGeminiControls()
         setupComicModeControls()
         setupCalibrationSliders()
@@ -156,6 +163,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         updatePermissionAndServiceUi()
         refreshHymtStatusUi()
+        refreshMlKitStatusUi()
         updateActiveSummaryLine()
     }
 
@@ -194,6 +202,10 @@ class MainActivity : AppCompatActivity() {
         layoutGeminiConfig = findViewById(R.id.layoutGeminiConfig)
         etGeminiApiKey = findViewById(R.id.etGeminiApiKey)
         tvGetApiKey = findViewById(R.id.tvGetApiKey)
+
+        layoutMlKitConfig = findViewById(R.id.layoutMlKitConfig)
+        tvMlKitStatus = findViewById(R.id.tvMlKitStatus)
+        btnDownloadMlKitPacks = findViewById(R.id.btnDownloadMlKitPacks)
 
         layoutComicModeRow = findViewById(R.id.layoutComicModeRow)
         switchComicMode = findViewById(R.id.switchComicMode)
@@ -285,11 +297,13 @@ class MainActivity : AppCompatActivity() {
 
         dropdownSourceLang.setOnItemClickListener { _, _, position, _ ->
             prefs.sourceLanguage = sourceOptions[position].code
+            refreshMlKitStatusUi()
             updateActiveSummaryLine()
         }
 
         dropdownTargetLang.setOnItemClickListener { _, _, position, _ ->
             prefs.targetLanguage = targetOptions[position].code
+            refreshMlKitStatusUi()
             updateActiveSummaryLine()
         }
 
@@ -312,6 +326,7 @@ class MainActivity : AppCompatActivity() {
                 prefs.targetLanguage = currentSrc
             }
             syncLanguageDropdownTexts()
+            refreshMlKitStatusUi()
             updateActiveSummaryLine()
         }
     }
@@ -355,7 +370,11 @@ class MainActivity : AppCompatActivity() {
         )
 
         layoutHymtManager.visibility = if (mode == AppPreferences.ENGINE_HY_MT2) View.VISIBLE else View.GONE
+        layoutMlKitConfig.visibility = if (mode == AppPreferences.ENGINE_ML_KIT) View.VISIBLE else View.GONE
         layoutGeminiConfig.visibility = if (mode == AppPreferences.ENGINE_GEMINI) View.VISIBLE else View.GONE
+        if (mode == AppPreferences.ENGINE_ML_KIT) {
+            refreshMlKitStatusUi()
+        }
     }
 
     private fun setupHymtManagerControls() {
@@ -365,6 +384,12 @@ class MainActivity : AppCompatActivity() {
             else -> R.id.btnVarBalanced
         }
         toggleHymtVariant.check(checkedId)
+        // MaterialButtonToggleGroup overrides child MaterialButtons to single-line + end ellipsis on inflation
+        listOf(btnVarCompact, btnVarBalanced, btnVarQuality).forEach { btn ->
+            btn.maxLines = 2
+            btn.ellipsize = null
+            btn.setLineSpacing(0f, 1.08f)
+        }
 
         toggleHymtVariant.addOnButtonCheckedListener { _, id, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -518,6 +543,69 @@ class MainActivity : AppCompatActivity() {
                     btnDownloadOrLoadModel.isEnabled = true
                     btnDeleteModel.visibility = View.GONE
                 }
+            }
+        }
+    }
+
+    private fun setupMlKitControls() {
+        btnDownloadMlKitPacks.setOnClickListener {
+            if (isDownloadingMlKitPacks) return@setOnClickListener
+            val neededCodes = requiredMlKitCodesForCurrentPrefs()
+            isDownloadingMlKitPacks = true
+            btnDownloadMlKitPacks.isEnabled = false
+            btnDownloadMlKitPacks.text = "Đang tải gói offline..."
+            tvMlKitStatus.text = "Đang kết nối Google ML Kit để tải..."
+
+            lifecycleScope.launch {
+                val res = TranslationManager.downloadMlKitLanguages(neededCodes) { done, total, code ->
+                    runOnUiThread {
+                        tvMlKitStatus.text = "Đang tải gói '${code.uppercase()}' ($done/$total)..."
+                    }
+                }
+                isDownloadingMlKitPacks = false
+                if (res.isSuccess) {
+                    showNotice("Đã tải xong gói ngôn ngữ ML Kit offline!")
+                } else {
+                    val msg = res.exceptionOrNull()?.message ?: "Không thể tải gói offline"
+                    showNotice(msg)
+                }
+                refreshMlKitStatusUi()
+            }
+        }
+    }
+
+    private fun requiredMlKitCodesForCurrentPrefs(): List<String> {
+        val tgt = prefs.targetLanguage
+        val src = prefs.sourceLanguage
+        return if (src == AppLanguages.AUTO) {
+            listOf(tgt, "en", "ja", "ko", "zh").distinct()
+        } else {
+            listOf(tgt, src).distinct()
+        }
+    }
+
+    private fun refreshMlKitStatusUi() {
+        if (!::layoutMlKitConfig.isInitialized || isDownloadingMlKitPacks) return
+        val needed = requiredMlKitCodesForCurrentPrefs()
+        lifecycleScope.launch {
+            val downloaded = TranslationManager.listDownloadedMlKitCodes()
+            val mappedNeeded = needed.mapNotNull { code ->
+                TranslationManager.mapToMlKitLanguage(code)?.let { mlCode ->
+                    code.uppercase() to (mlCode.lowercase() in downloaded)
+                }
+            }
+            val missing = mappedNeeded.filter { !it.second }.map { it.first }
+            val ready = mappedNeeded.filter { it.second }.map { it.first }
+
+            if (missing.isEmpty() && mappedNeeded.isNotEmpty()) {
+                tvMlKitStatus.text = "Đã sẵn sàng 100% offline: ${ready.joinToString(", ")}"
+                btnDownloadMlKitPacks.text = "Đã đủ gói offline (${ready.joinToString(", ")})"
+                btnDownloadMlKitPacks.isEnabled = false
+            } else {
+                val readyLabel = if (ready.isNotEmpty()) ready.joinToString(", ") else "Chưa có"
+                tvMlKitStatus.text = "Đã tải: $readyLabel · Cần tải thêm: ${missing.joinToString(", ")}"
+                btnDownloadMlKitPacks.text = "Tải ${missing.size} gói offline (${missing.joinToString(", ")})"
+                btnDownloadMlKitPacks.isEnabled = true
             }
         }
     }

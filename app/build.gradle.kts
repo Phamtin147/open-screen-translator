@@ -8,12 +8,36 @@ android {
     compileSdk = 34
     ndkVersion = "28.2.13676358"
 
+    val appVersionCode = (project.findProperty("versionCode") as String?)?.toIntOrNull() ?: 100
+    val appVersionName = (project.findProperty("versionName") as String?)?.takeIf { it.isNotBlank() } ?: "1.1.0"
+
+    val ksPath = System.getenv("ANDROID_KEYSTORE_PATH")
+    val ksStorePass = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+    val ksAlias = System.getenv("ANDROID_KEY_ALIAS")
+    val ksKeyPass = System.getenv("ANDROID_KEY_PASSWORD")
+    val hasReleaseSigning = !ksPath.isNullOrBlank() &&
+        file(ksPath).exists() &&
+        !ksStorePass.isNullOrBlank() &&
+        !ksAlias.isNullOrBlank() &&
+        !ksKeyPass.isNullOrBlank()
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(ksPath)
+                storePassword = ksStorePass
+                keyAlias = ksAlias
+                keyPassword = ksKeyPass
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.openscreentranslator.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
@@ -56,6 +80,11 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

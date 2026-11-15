@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <cstring>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -83,7 +85,44 @@ bool is_valid_utf8(const std::string &str) {
 int compute_thread_count() {
     const int cpu_count = static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
     if (cpu_count <= 2) return 2;
-    return std::max(kMinThreads, std::min(kMaxThreads, cpu_count - 1));
+
+    long min_freq = std::numeric_limits<long>::max();
+    long max_freq = 0;
+    std::vector<long> freqs;
+    freqs.reserve(static_cast<size_t>(cpu_count));
+
+    for (int i = 0; i < cpu_count; ++i) {
+        char path[96];
+        std::snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq", i);
+        FILE *f = std::fopen(path, "r");
+        long freq = 0;
+        if (f) {
+            if (std::fscanf(f, "%ld", &freq) != 1) {
+                freq = 0;
+            }
+            std::fclose(f);
+        }
+        if (freq > 0) {
+            min_freq = std::min(min_freq, freq);
+            max_freq = std::max(max_freq, freq);
+        }
+        freqs.push_back(freq);
+    }
+
+    if (max_freq > min_freq + 200000L && min_freq < std::numeric_limits<long>::max()) {
+        const long threshold = min_freq + (max_freq - min_freq) / 4;
+        int fast_cores = 0;
+        for (long freq : freqs) {
+            if (freq > threshold) {
+                fast_cores += 1;
+            }
+        }
+        if (fast_cores >= kMinThreads) {
+            return std::min(kMaxThreads, fast_cores);
+        }
+    }
+
+    return std::max(kMinThreads, std::min(4, cpu_count / 2));
 }
 
 bool decode_tokens(llama_context *ctx, common_batch &batch, const llama_tokens &tokens) {

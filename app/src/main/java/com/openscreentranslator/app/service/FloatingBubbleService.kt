@@ -23,7 +23,6 @@ import android.os.Looper
 import android.util.DisplayMetrics
 import android.util.Log
 import android.view.WindowManager
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import com.openscreentranslator.app.R
 import com.openscreentranslator.app.data.AppPreferences
@@ -209,19 +208,27 @@ class FloatingBubbleService : Service() {
         activeTranslationJob = null
         isProcessing = false
         overlayManager.setBubbleLoading(false)
-        showNotice("Đã hủy thao tác dịch.", force = true)
+        overlayManager.showStatusPill("Đã hủy thao tác dịch.", autoHideMs = 1800L)
+    }
+
+    private fun engineShortLabel(mode: String): String = when (mode) {
+        AppPreferences.ENGINE_HY_MT2 -> "Hy-MT2"
+        AppPreferences.ENGINE_GEMINI -> "Gemini"
+        AppPreferences.ENGINE_CLOUD_FREE -> "Cloud"
+        else -> "ML Kit"
     }
 
     private fun captureAndTranslate() {
         if (isProcessing) return
         val reader = imageReader
         if (reader == null) {
-            showNotice("Mất quyền chụp màn hình — hãy Dừng rồi Bật lại trong app.", force = true)
+            overlayManager.showStatusPill("Mất quyền chụp màn hình — hãy Dừng rồi Bật lại trong app.", autoHideMs = 3000L)
             return
         }
 
         isProcessing = true
         overlayManager.setBubbleLoading(true)
+        overlayManager.showStatusPill("Đang chụp & nhận diện chữ...")
 
         val srcLang = prefs.sourceLanguage
         val targetLang = prefs.targetLanguage
@@ -247,7 +254,10 @@ class FloatingBubbleService : Service() {
 
                     val bitmap = capturedBitmap
                     if (bitmap == null) {
-                        showNotice("Chưa lấy được khung hình — hãy vuốt nhẹ hoặc chọn Chia sẻ toàn màn hình.", force = true)
+                        overlayManager.showStatusPill(
+                            "Chưa lấy được khung hình — hãy vuốt nhẹ hoặc chọn Chia sẻ toàn màn hình.",
+                            autoHideMs = 3200L
+                        )
                         return@withTimeout
                     }
 
@@ -264,9 +274,11 @@ class FloatingBubbleService : Service() {
                     capturedBitmap = null
 
                     if (ocrBlocks.isEmpty()) {
-                        showNotice("Không nhận diện được chữ trên màn hình.", force = true)
+                        overlayManager.showStatusPill("Không nhận diện được chữ trên màn hình.", autoHideMs = 2600L)
                         return@withTimeout
                     }
+
+                    overlayManager.showStatusPill("Đang dịch ${ocrBlocks.size} khung (${engineShortLabel(engineMode)})...")
 
                     val pageResult = translationManager.translatePageBubbles(
                         blocks = ocrBlocks,
@@ -278,24 +290,24 @@ class FloatingBubbleService : Service() {
                         preferredHymtVariant = preferredHymtVariant
                     )
 
-                    pageResult.fallbackNotice?.let { notice ->
-                        showNotice(notice, force = false)
-                    }
-
                     overlayManager.drawTranslationCards(
                         results = pageResult.translatedBlocks,
                         showBubbleOrderIndex = comicMode && pageResult.translatedBlocks.size > 1
                     )
+
+                    pageResult.fallbackNotice?.let { notice ->
+                        showNotice(notice, force = false)
+                    }
                 }
             } catch (_: TimeoutCancellationException) {
                 LlamaBridge.cancelIfLoaded()
                 Log.e(TAG, "Screen translation pipeline timed out")
-                showNotice("Quá thời gian chờ dịch — vui lòng thử lại hoặc đổi bộ dịch.", force = true)
+                overlayManager.showStatusPill("Quá thời gian chờ dịch — vui lòng thử lại.", autoHideMs = 3200L)
             } catch (_: CancellationException) {
                 // Cancelled explicitly by user tap or service destruction
             } catch (t: Throwable) {
                 Log.e(TAG, "Translation pipeline failed", t)
-                showNotice("Lỗi khi dịch: ${t.message ?: t.javaClass.simpleName}", force = true)
+                overlayManager.showStatusPill("Lỗi dịch: ${t.message ?: t.javaClass.simpleName}", autoHideMs = 3200L)
             } finally {
                 capturedBitmap?.let { bmp ->
                     if (!bmp.isRecycled) bmp.recycle()
@@ -371,9 +383,7 @@ class FloatingBubbleService : Service() {
         val now = System.currentTimeMillis()
         if (!force && now - lastNoticeTimestamp <= 8000L) return
         lastNoticeTimestamp = now
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(this@FloatingBubbleService, message, Toast.LENGTH_SHORT).show()
-        }
+        overlayManager.showStatusPill(message, autoHideMs = 3400L)
     }
 
     private fun createNotificationChannel() {

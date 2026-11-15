@@ -524,8 +524,10 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:fontFeatureSettings="tnum"
+                            android:maxLines="2"
                             android:minHeight="52dp"
                             android:paddingHorizontal="6dp"
+                            android:singleLine="false"
                             android:text="IQ2_M&#10;689 MB"
                             android:textAllCaps="false"
                             android:textColor="@color/ink_primary"
@@ -540,8 +542,10 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:fontFeatureSettings="tnum"
+                            android:maxLines="2"
                             android:minHeight="52dp"
                             android:paddingHorizontal="6dp"
+                            android:singleLine="false"
                             android:text="Q3_K_S&#10;832 MB"
                             android:textAllCaps="false"
                             android:textColor="@color/ink_primary"
@@ -556,8 +560,10 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:fontFeatureSettings="tnum"
+                            android:maxLines="2"
                             android:minHeight="52dp"
                             android:paddingHorizontal="6dp"
+                            android:singleLine="false"
                             android:text="Q4_K_M&#10;1.08 GB"
                             android:textAllCaps="false"
                             android:textColor="@color/ink_primary"
@@ -608,6 +614,8 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
+                        android:baselineAligned="false"
+                        android:gravity="center_vertical"
                         android:orientation="horizontal">
 
                         <com.google.android.material.button.MaterialButton
@@ -616,6 +624,7 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:minHeight="48dp"
+                            android:paddingVertical="10dp"
                             android:text="Tải model GGUF"
                             android:textAllCaps="false"
                             android:textColor="@color/on_accent"
@@ -640,6 +649,50 @@
                             app:strokeColor="@color/status_danger"
                             app:strokeWidth="1dp" />
                     </LinearLayout>
+                </LinearLayout>
+
+                <!-- CONTEXTUAL DRAWER: GOOGLE ML KIT OFFLINE MANAGER -->
+                <LinearLayout
+                    android:id="@+id/layoutMlKitConfig"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_preview_plate"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Gói dịch offline Google ML Kit (~30 MB/ngôn ngữ)"
+                        android:textColor="@color/ink_primary"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvMlKitStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:fontFeatureSettings="tnum"
+                        android:text="Đang kiểm tra gói ngôn ngữ đã tải..."
+                        android:textColor="@color/ink_secondary"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnDownloadMlKitPacks"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:minHeight="48dp"
+                        android:text="Tải gói offline cho cặp ngôn ngữ này"
+                        android:textAllCaps="false"
+                        android:textColor="@color/on_accent"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        app:backgroundTint="@color/accent_vermilion"
+                        app:cornerRadius="10dp" />
                 </LinearLayout>
 
                 <!-- CONTEXTUAL DRAWER: GEMINI API KEY -->
