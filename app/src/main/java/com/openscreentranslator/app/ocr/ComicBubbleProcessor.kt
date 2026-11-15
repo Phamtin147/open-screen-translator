@@ -1,8 +1,16 @@
 package com.openscreentranslator.app.ocr
 
+import com.openscreentranslator.app.data.AppLanguages
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
+enum class RecognizerScript {
+    LATIN,
+    JAPANESE,
+    KOREAN,
+    CHINESE
+}
 
 /**
  * Immutable bounding box in screen pixel coordinates.
@@ -16,6 +24,7 @@ data class RectBox(
 ) {
     val width: Int get() = (right - left).coerceAtLeast(1)
     val height: Int get() = (bottom - top).coerceAtLeast(1)
+    val area: Float get() = width.toFloat() * height.toFloat()
     val centerX: Float get() = (left + right) * 0.5f
     val centerY: Float get() = (top + bottom) * 0.5f
 
@@ -25,6 +34,15 @@ data class RectBox(
         right = max(right, other.right),
         bottom = max(bottom, other.bottom)
     )
+
+    fun intersectionArea(other: RectBox): Float {
+        val iLeft = max(left, other.left)
+        val iTop = max(top, other.top)
+        val iRight = min(right, other.right)
+        val iBottom = min(bottom, other.bottom)
+        if (iRight <= iLeft || iBottom <= iTop) return 0f
+        return (iRight - iLeft).toFloat() * (iBottom - iTop).toFloat()
+    }
 }
 
 data class OcrLine(
@@ -35,14 +53,16 @@ data class OcrLine(
 data class RawOcrBlock(
     val text: String,
     val box: RectBox,
-    val lines: List<OcrLine> = emptyList()
+    val lines: List<OcrLine> = emptyList(),
+    val scriptHint: RecognizerScript = RecognizerScript.LATIN
 )
 
 data class ProcessedBubble(
     val orderIndex: Int,
     val text: String,
     val box: RectBox,
-    val mergedCount: Int
+    val mergedCount: Int,
+    val detectedLang: String? = null
 )
 
 enum class ReadingDirection {
@@ -54,6 +74,7 @@ enum class ReadingDirection {
  * Solves two core comic/manga OCR issues:
  * 1. Wrapped multi-line text inside speech bubbles (breaks hyphenation, mid-sentence newlines, vertical CJK line splits).
  * 2. Multiple fragmented OCR blocks inside the same bubble + naive y-order tearing multi-panel comic pages apart.
+ * 3. Cross-script candidate fusion when running Latin + Japanese + Korean + Chinese OCR simultaneously.
  */
 object ComicBubbleProcessor {
 
@@ -62,12 +83,107 @@ object ComicBubbleProcessor {
     private val CJK_CHAR_REGEX = Regex("[\\u3040-\\u30ff\\u3400-\\u4dbf\\u4e00-\\u9fff\\uf900-\\ufaff]")
     private val SENTENCE_END_CHARS = setOf('.', '!', '?', '…', '。', '！', '？', '」', '』', '"', '”')
 
+    /**
+     * Fuses OCR detections emitted across Latin, Japanese, Korean, and Chinese recognizers on one image.
+     * Overlapping candidates covering the same speech bubble keep whichever recognizer best matches
+     * the native Unicode script (preventing duplicate cards and Latin garbling of CJK/Hangul glyphs).
+     */
+    fun mergeCrossScriptCandidates(candidates: List<RawOcrBlock>): List<RawOcrBlock> {
+        if (candidates.isEmpty()) return emptyList()
+
+        val validCandidates = candidates.filter { cand ->
+            val trimmed = cand.text.trim()
+            trimmed.isNotEmpty() && !PURE_NOISE_REGEX.matches(trimmed) && cand.box.width >= 6 && cand.box.height >= 6
+        }
+        if (validCandidates.isEmpty()) return emptyList()
+
+        val pageHasKana = validCandidates.any { AppLanguages.containsKana(it.text) }
+
+        val ranked = validCandidates
+            .mapIndexed { idx, block ->
+                val score = scoreScriptCandidate(block, pageHasKana)
+                Triple(score, idx, block)
+            }
+            .sortedWith(compareByDescending<Triple<Float, Int, RawOcrBlock>> { it.first }.thenBy { it.second })
+
+        val accepted = mutableListOf<RawOcrBlock>()
+        for ((_, _, candidate) in ranked) {
+            val overlapsExisting = accepted.any { existing ->
+                val inter = existing.box.intersectionArea(candidate.box)
+                if (inter <= 0f) {
+                    false
+                } else {
+                    val minArea = min(existing.box.area, candidate.box.area).coerceAtLeast(1f)
+                    val unionArea = (existing.box.area + candidate.box.area - inter).coerceAtLeast(1f)
+                    val containment = inter / minArea
+                    val iou = inter / unionArea
+                    iou >= 0.30f || containment >= 0.50f
+                }
+            }
+            if (!overlapsExisting) {
+                accepted.add(candidate)
+            }
+        }
+        return accepted
+    }
+
+    internal fun scoreScriptCandidate(block: RawOcrBlock, pageHasKana: Boolean): Float {
+        var kanaCount = 0
+        var hangulCount = 0
+        var hanCount = 0
+        var latinCount = 0
+        var digitCount = 0
+        var noiseCount = 0
+
+        for (ch in block.text) {
+            when {
+                ch.isWhitespace() -> Unit
+                AppLanguages.isKanaChar(ch) -> kanaCount++
+                AppLanguages.isHangulChar(ch) -> hangulCount++
+                AppLanguages.isHanChar(ch) -> hanCount++
+                ch.isLetter() -> latinCount++ // Covers ASCII + extended Latin (Vietnamese, French, Spanish, ...)
+                ch.isDigit() -> digitCount++
+                ch in setOf('.', ',', '!', '?', '…', '。', '！', '？', '-', '\'', '"', ':', '~') -> Unit
+                else -> noiseCount++
+            }
+        }
+
+        val contentScore = kanaCount * 4.5f +
+            hangulCount * 4.2f +
+            hanCount * 3.2f +
+            latinCount * 2.5f +
+            digitCount * 0.9f -
+            noiseCount * 1.1f
+
+        val nativeAffinity = when (block.scriptHint) {
+            RecognizerScript.JAPANESE -> when {
+                kanaCount > 0 -> 12.0f
+                hanCount > 0 && pageHasKana -> 10.0f
+                hanCount > 0 -> 7.0f
+                else -> 0f
+            }
+            RecognizerScript.KOREAN -> if (hangulCount > 0) 12.0f else 0f
+            RecognizerScript.CHINESE -> when {
+                hanCount > 0 && kanaCount == 0 -> 9.0f
+                hanCount > 0 -> 4.0f
+                else -> 0f
+            }
+            RecognizerScript.LATIN -> {
+                if (latinCount > 0 && kanaCount == 0 && hangulCount == 0 && hanCount == 0) 6.5f else 0f
+            }
+        }
+
+        return contentScore + nativeAffinity
+    }
+
     fun processBlocks(
         rawBlocks: List<RawOcrBlock>,
         sourceLang: String,
         comicModeEnabled: Boolean,
         readingDirection: ReadingDirection
     ): List<ProcessedBubble> {
+        val pageHasKana = rawBlocks.any { AppLanguages.containsKana(it.text) }
+
         val validBlocks = rawBlocks.mapNotNull { block ->
             val cleanedLines = extractCleanLines(block)
             val joined = if (cleanedLines.isNotEmpty()) {
@@ -104,11 +220,17 @@ object ComicBubbleProcessor {
 
         return ordered.mapIndexed { index, cluster ->
             val mergedText = assembleClusterText(cluster, sourceLang)
+            val detected = if (sourceLang == AppLanguages.AUTO) {
+                AppLanguages.detectDeterministicScriptLanguage(mergedText, pageHasKana)
+            } else {
+                sourceLang
+            }
             ProcessedBubble(
                 orderIndex = index + 1,
                 text = mergedText,
                 box = cluster.box,
-                mergedCount = cluster.blockCount
+                mergedCount = cluster.blockCount,
+                detectedLang = detected
             )
         }.filter { it.text.isNotBlank() }
     }
@@ -193,6 +315,18 @@ object ComicBubbleProcessor {
         if (sourceLang == "ja" || sourceLang == "zh") {
             return CJK_CHAR_REGEX.containsMatchIn(prev) || CJK_CHAR_REGEX.containsMatchIn(next)
         }
+        if (sourceLang == AppLanguages.AUTO) {
+            val combinedHasCjk = CJK_CHAR_REGEX.containsMatchIn(prev) || CJK_CHAR_REGEX.containsMatchIn(next)
+            if (!combinedHasCjk) return false
+            // Korean Hangul uses spaces between words
+            if (AppLanguages.containsHangul(prev) || AppLanguages.containsHangul(next)) return false
+            val prevLast = prev.lastOrNull() ?: return false
+            val nextFirst = next.firstOrNull() ?: return false
+            // Keep spaces between two adjacent ASCII words inside mixed-script Japanese text
+            val bothAsciiAlphaNum = prevLast.code < 128 && prevLast.isLetterOrDigit() &&
+                nextFirst.code < 128 && nextFirst.isLetterOrDigit()
+            return !bothAsciiAlphaNum
+        }
         val prevLast = prev.lastOrNull() ?: return false
         val nextFirst = next.firstOrNull() ?: return false
         return CJK_CHAR_REGEX.matches(prevLast.toString()) && CJK_CHAR_REGEX.matches(nextFirst.toString())
@@ -233,7 +367,7 @@ object ComicBubbleProcessor {
         lines: List<OcrLine>,
         sourceLang: String
     ): Boolean {
-        if (sourceLang != "ja" && sourceLang != "zh") return false
+        if (sourceLang != AppLanguages.AUTO && sourceLang != "ja" && sourceLang != "zh") return false
         if (!CJK_CHAR_REGEX.containsMatchIn(block.text)) return false
         if (lines.any { it.box.height > it.box.width * 1.75f }) return true
         return lines.size == 1 && block.box.height > block.box.width * 1.75f
@@ -281,11 +415,23 @@ object ComicBubbleProcessor {
         return clusters
     }
 
+    private fun hasConflictingNativeScripts(a: InternalCluster, b: InternalCluster): Boolean {
+        val textA = a.lines.joinToString("") { it.text }
+        val textB = b.lines.joinToString("") { it.text }
+        val aKana = AppLanguages.containsKana(textA)
+        val bKana = AppLanguages.containsKana(textB)
+        val aHangul = AppLanguages.containsHangul(textA)
+        val bHangul = AppLanguages.containsHangul(textB)
+        return (aKana && bHangul) || (aHangul && bKana)
+    }
+
     private fun shouldMergeSameBubble(
         a: InternalCluster,
         b: InternalCluster,
         sourceLang: String
     ): Boolean {
+        if (sourceLang == AppLanguages.AUTO && hasConflictingNativeScripts(a, b)) return false
+
         val lhA = a.estimatedLineHeight
         val lhB = b.estimatedLineHeight
         val minLh = min(lhA, lhB).coerceAtLeast(8f)
@@ -297,7 +443,7 @@ object ComicBubbleProcessor {
         val refUnit = maxLh
 
         // Case 1: Vertical CJK columns inside one manga speech bubble sit side-by-side
-        if ((a.isVerticalCjk || b.isVerticalCjk) && (sourceLang == "ja" || sourceLang == "zh")) {
+        if ((a.isVerticalCjk || b.isVerticalCjk) && (sourceLang == AppLanguages.AUTO || sourceLang == "ja" || sourceLang == "zh")) {
             val yOverlap = min(a.box.bottom, b.box.bottom) - max(a.box.top, b.box.top)
             val minHeight = min(a.box.height, b.box.height).coerceAtLeast(1)
             val xGap = horizontalGap(a.box, b.box)

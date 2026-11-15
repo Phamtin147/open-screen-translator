@@ -1,5 +1,7 @@
 package com.openscreentranslator.app.translation
 
+import com.openscreentranslator.app.data.AppLanguages
+
 /**
  * Pure JVM helper for building & parsing comic-context prompts for Hy-MT2-1.8B and Gemini.
  */
@@ -8,19 +10,27 @@ object TranslationBatchHelper {
     private val TAG_HEADER_REGEX = Regex("(?:\\[\\[B(\\d+)]]|\\[B(\\d+)])")
     private val HY_SPECIAL_TOKEN_REGEX = Regex("<｜[^｜]+｜>")
 
-    fun languageEnglishName(code: String): String = when (code) {
-        "ja" -> "Japanese"
-        "ko" -> "Korean"
-        "zh" -> "Chinese"
-        "vi" -> "Vietnamese"
-        else -> "English"
-    }
+    fun languageEnglishName(code: String): String = AppLanguages.englishName(code)
 
     fun buildSingleHymtPrompt(sourceText: String, targetLang: String): String {
         val targetName = languageEnglishName(targetLang)
         return "Translate the following text into $targetName. " +
             "Note that you should only output the translated result without any additional explanation:\n\n" +
             sourceText
+    }
+
+    fun buildGeminiSinglePrompt(
+        sourceText: String,
+        sourceLang: String,
+        targetLang: String
+    ): String {
+        val sourceLine = if (sourceLang == AppLanguages.AUTO || sourceLang.isBlank()) {
+            "Automatically detect the source language (the snippet may mix multiple languages)."
+        } else {
+            "Source language: ${languageEnglishName(sourceLang)}."
+        }
+        return buildSingleHymtPrompt(sourceText = sourceText, targetLang = targetLang) +
+            "\n$sourceLine"
     }
 
     fun buildContextSingleHymtPrompt(
@@ -42,18 +52,38 @@ object TranslationBatchHelper {
         bubbles: List<String>,
         targetLang: String,
         sourceLang: String,
-        includeContextInstruction: Boolean = true
+        includeContextInstruction: Boolean = true,
+        bubbleDetectedLangs: List<String?> = emptyList()
     ): String {
         val targetName = languageEnglishName(targetLang)
-        val sourceName = languageEnglishName(sourceLang)
         val payload = bubbles.mapIndexed { idx, text ->
             val sanitized = text.replace("\n", " ").trim()
             "[[B${idx + 1}]] $sanitized"
         }.joinToString("\n")
 
         val contextNote = if (includeContextInstruction) {
-            "These lines are sequential speech bubbles from one comic/screen page in $sourceName. " +
-                "Keep character pronouns, speaker relationship, and tone consistent across bubbles.\n"
+            if (sourceLang == AppLanguages.AUTO) {
+                val detectedNames = bubbleDetectedLangs
+                    .filterNotNull()
+                    .filter { it != AppLanguages.AUTO }
+                    .distinct()
+                    .map { languageEnglishName(it) }
+                when {
+                    detectedNames.size >= 2 ->
+                        "These lines are sequential speech bubbles from one comic/screen page containing multiple source languages (${detectedNames.joinToString(", ")}). " +
+                            "Detect each bubble's language individually, translate ALL bubbles into $targetName, and keep character pronouns, speaker relationship, and tone consistent across bubbles.\n"
+                    detectedNames.size == 1 ->
+                        "These lines are sequential speech bubbles from one comic/screen page (primarily ${detectedNames.first()}, possibly mixed with other languages). " +
+                            "Auto-detect each bubble's language, translate ALL bubbles into $targetName, and keep character pronouns, speaker relationship, and tone consistent across bubbles.\n"
+                    else ->
+                        "These lines are sequential speech bubbles from one comic/screen page and may contain multiple source languages mixed together. " +
+                            "Auto-detect each bubble's language, translate ALL bubbles into $targetName, and keep character pronouns, speaker relationship, and tone consistent across bubbles.\n"
+                }
+            } else {
+                val sourceName = languageEnglishName(sourceLang)
+                "These lines are sequential speech bubbles from one comic/screen page in $sourceName. " +
+                    "Keep character pronouns, speaker relationship, and tone consistent across bubbles.\n"
+            }
         } else {
             ""
         }

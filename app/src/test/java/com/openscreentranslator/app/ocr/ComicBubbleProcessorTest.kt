@@ -1,6 +1,8 @@
 package com.openscreentranslator.app.ocr
 
+import com.openscreentranslator.app.data.AppLanguages
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -163,5 +165,112 @@ class ComicBubbleProcessorTest {
             readingDirection = ReadingDirection.COMIC_LTR
         )
         assertEquals(listOf("TL", "TR", "BL", "BR"), ltr.map { it.text })
+    }
+
+    @Test
+    fun fusesOverlappingCrossScriptCandidatesAcrossMultipleLanguagesOnOnePage() {
+        val enLat = RawOcrBlock(
+            text = "Watch out!",
+            box = RectBox(100, 100, 320, 160),
+            scriptHint = RecognizerScript.LATIN
+        )
+        val enJaDup = RawOcrBlock(
+            text = "Watch out!",
+            box = RectBox(102, 101, 318, 159),
+            scriptHint = RecognizerScript.JAPANESE
+        )
+
+        val jaNative = RawOcrBlock(
+            text = "そんなまさか！",
+            box = RectBox(550, 100, 820, 220),
+            scriptHint = RecognizerScript.JAPANESE
+        )
+        val jaLatNoise = RawOcrBlock(
+            text = "thA1!",
+            box = RectBox(555, 105, 810, 215),
+            scriptHint = RecognizerScript.LATIN
+        )
+
+        val koNative = RawOcrBlock(
+            text = "잠깐만 기다려!",
+            box = RectBox(100, 420, 380, 500),
+            scriptHint = RecognizerScript.KOREAN
+        )
+        val koLatNoise = RawOcrBlock(
+            text = "xAA=",
+            box = RectBox(104, 422, 376, 496),
+            scriptHint = RecognizerScript.LATIN
+        )
+
+        val fused = ComicBubbleProcessor.mergeCrossScriptCandidates(
+            listOf(enJaDup, enLat, jaLatNoise, jaNative, koLatNoise, koNative)
+        )
+
+        assertEquals(3, fused.size)
+        val texts = fused.map { it.text }.toSet()
+        assertTrue(texts.contains("Watch out!"))
+        assertTrue(texts.contains("そんなまさか！"))
+        assertTrue(texts.contains("잠깐만 기다려!"))
+        assertEquals(RecognizerScript.LATIN, fused.first { it.text == "Watch out!" }.scriptHint)
+    }
+
+    @Test
+    fun processesMixedJaEnKoPageInAutoModeWithPerBubbleScriptSpacingAndDetection() {
+        val jaVertColRight = RawOcrBlock(
+            text = "お前は",
+            box = RectBox(700, 100, 740, 280),
+            lines = listOf(OcrLine("お前は", RectBox(700, 100, 740, 280))),
+            scriptHint = RecognizerScript.JAPANESE
+        )
+        val jaVertColLeft = RawOcrBlock(
+            text = "誰だ？",
+            box = RectBox(650, 105, 690, 280),
+            lines = listOf(OcrLine("誰だ？", RectBox(650, 105, 690, 280))),
+            scriptHint = RecognizerScript.JAPANESE
+        )
+        val enWrapped = RawOcrBlock(
+            text = "Stay right\nthere now!",
+            box = RectBox(100, 110, 320, 190),
+            lines = listOf(
+                OcrLine("Stay right", RectBox(100, 110, 320, 145)),
+                OcrLine("there now!", RectBox(105, 152, 315, 188))
+            ),
+            scriptHint = RecognizerScript.LATIN
+        )
+        val koWrapped = RawOcrBlock(
+            text = "잠깐만\n기다려!",
+            box = RectBox(120, 420, 340, 510),
+            lines = listOf(
+                OcrLine("잠깐만", RectBox(120, 420, 340, 455)),
+                OcrLine("기다려!", RectBox(120, 465, 340, 505))
+            ),
+            scriptHint = RecognizerScript.KOREAN
+        )
+        val kanjiOnly = RawOcrBlock(
+            text = "無言",
+            box = RectBox(640, 430, 720, 500),
+            scriptHint = RecognizerScript.JAPANESE
+        )
+
+        val result = ComicBubbleProcessor.processBlocks(
+            rawBlocks = listOf(enWrapped, koWrapped, jaVertColLeft, jaVertColRight, kanjiOnly),
+            sourceLang = AppLanguages.AUTO,
+            comicModeEnabled = true,
+            readingDirection = ReadingDirection.MANGA_RTL
+        )
+
+        assertEquals(4, result.size)
+        // RTL top tier: JA bubble -> EN bubble; bottom tier: Kanji-only JA -> KO
+        assertEquals("お前は誰だ？", result[0].text)
+        assertEquals("ja", result[0].detectedLang)
+
+        assertEquals("Stay right there now!", result[1].text)
+        assertNull(result[1].detectedLang) // Deferred to ML Kit LanguageIdentification
+
+        assertEquals("無言", result[2].text)
+        assertEquals("ja", result[2].detectedLang) // Kanji-only on Kana page resolves to Japanese
+
+        assertEquals("잠깐만 기다려!", result[3].text) // Hangul preserves spaces between lines
+        assertEquals("ko", result[3].detectedLang)
     }
 }

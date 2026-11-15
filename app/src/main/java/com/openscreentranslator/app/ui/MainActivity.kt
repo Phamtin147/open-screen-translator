@@ -40,6 +40,7 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputEditText
 import com.openscreentranslator.app.R
+import com.openscreentranslator.app.data.AppLanguages
 import com.openscreentranslator.app.data.AppPreferences
 import com.openscreentranslator.app.ocr.ReadingDirection
 import com.openscreentranslator.app.service.FloatingBubbleService
@@ -54,15 +55,6 @@ import kotlinx.coroutines.withContext
 class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: AppPreferences
-
-    private val languageLabels = listOf(
-        "Tiếng Anh (EN)",
-        "Tiếng Nhật (JA)",
-        "Tiếng Trung (ZH)",
-        "Tiếng Hàn (KO)",
-        "Tiếng Việt (VI)"
-    )
-    private val languageCodes = listOf("en", "ja", "zh", "ko", "vi")
 
     // UI references
     private lateinit var btnThemeMode: MaterialButton
@@ -282,38 +274,55 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupLanguageControls() {
         val itemLayout = com.google.android.material.R.layout.mtrl_auto_complete_simple_item
-        val srcAdapter = ArrayAdapter(this, itemLayout, languageLabels)
-        val tgtAdapter = ArrayAdapter(this, itemLayout, languageLabels)
+        val sourceOptions = AppLanguages.SOURCE_OPTIONS
+        val targetOptions = AppLanguages.TARGET_OPTIONS
+        val srcAdapter = ArrayAdapter(this, itemLayout, sourceOptions.map { it.labelVi })
+        val tgtAdapter = ArrayAdapter(this, itemLayout, targetOptions.map { it.labelVi })
         dropdownSourceLang.setAdapter(srcAdapter)
         dropdownTargetLang.setAdapter(tgtAdapter)
 
         syncLanguageDropdownTexts()
 
         dropdownSourceLang.setOnItemClickListener { _, _, position, _ ->
-            prefs.sourceLanguage = languageCodes[position]
+            prefs.sourceLanguage = sourceOptions[position].code
             updateActiveSummaryLine()
         }
 
         dropdownTargetLang.setOnItemClickListener { _, _, position, _ ->
-            prefs.targetLanguage = languageCodes[position]
+            prefs.targetLanguage = targetOptions[position].code
             updateActiveSummaryLine()
         }
 
         btnSwapLanguages.setOnClickListener {
             val currentSrc = prefs.sourceLanguage
             val currentTgt = prefs.targetLanguage
-            prefs.sourceLanguage = currentTgt
-            prefs.targetLanguage = currentSrc
+            if (currentSrc == AppLanguages.AUTO) {
+                if (AppLanguages.isOcrSupported(currentTgt)) {
+                    prefs.sourceLanguage = currentTgt
+                    prefs.targetLanguage = if (currentTgt == AppLanguages.DEFAULT_TARGET) "en" else AppLanguages.DEFAULT_TARGET
+                } else {
+                    showNotice("Chế độ Tự phát hiện không thể đặt làm ngôn ngữ đích.")
+                    return@setOnClickListener
+                }
+            } else if (!AppLanguages.isOcrSupported(currentTgt)) {
+                showNotice("Chưa hỗ trợ quét OCR chiều ngược cho ${AppLanguages.shortCode(currentTgt)}.")
+                return@setOnClickListener
+            } else {
+                prefs.sourceLanguage = currentTgt
+                prefs.targetLanguage = currentSrc
+            }
             syncLanguageDropdownTexts()
             updateActiveSummaryLine()
         }
     }
 
     private fun syncLanguageDropdownTexts() {
-        val srcIdx = languageCodes.indexOf(prefs.sourceLanguage).coerceAtLeast(0)
-        val tgtIdx = languageCodes.indexOf(prefs.targetLanguage).coerceAtLeast(4)
-        dropdownSourceLang.setText(languageLabels[srcIdx], false)
-        dropdownTargetLang.setText(languageLabels[tgtIdx], false)
+        val sourceOptions = AppLanguages.SOURCE_OPTIONS
+        val targetOptions = AppLanguages.TARGET_OPTIONS
+        val srcIdx = sourceOptions.indexOfFirst { it.code == prefs.sourceLanguage }.let { if (it >= 0) it else 0 }
+        val tgtIdx = targetOptions.indexOfFirst { it.code == prefs.targetLanguage }.let { if (it >= 0) it else 0 }
+        dropdownSourceLang.setText(sourceOptions[srcIdx].labelVi, false)
+        dropdownTargetLang.setText(targetOptions[tgtIdx].labelVi, false)
     }
 
     private fun setupEngineDeck() {
@@ -697,8 +706,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateActiveSummaryLine() {
-        val src = prefs.sourceLanguage.uppercase()
-        val tgt = prefs.targetLanguage.uppercase()
+        val src = AppLanguages.shortCode(prefs.sourceLanguage)
+        val tgt = AppLanguages.shortCode(prefs.targetLanguage)
         val engineLabel = when (prefs.engineMode) {
             AppPreferences.ENGINE_HY_MT2 -> {
                 val installed = ModelManager.getAnyInstalledVariant(this, prefs.hymtModelVariant)

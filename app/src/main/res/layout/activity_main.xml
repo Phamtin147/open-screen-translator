@@ -139,7 +139,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
                     android:fontFeatureSettings="tnum"
-                    android:text="EN → VI · Google ML Kit · Manga R→L"
+                    android:text="AUTO → VI · Google ML Kit · Manga R→L"
                     android:textColor="@color/ink_secondary"
                     android:textSize="13sp" />
 

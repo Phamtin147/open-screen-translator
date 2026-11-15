@@ -7,6 +7,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.Translator
 import com.google.mlkit.nl.translate.TranslatorOptions
+import com.openscreentranslator.app.data.AppLanguages
 import com.openscreentranslator.app.data.AppPreferences
 import com.openscreentranslator.app.ocr.OcrBlock
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +55,14 @@ class TranslationManager(private val appContext: Context? = null) {
             return@withContext PageTranslationResult(emptyList(), engineMode)
         }
 
-        if (sourceLang == targetLang) {
+        if (sourceLang != AppLanguages.AUTO && sourceLang == targetLang) {
+            return@withContext PageTranslationResult(
+                blocks.map { it.text to it.boundingBox },
+                engineMode
+            )
+        }
+
+        if (blocks.all { it.detectedLanguage == targetLang }) {
             return@withContext PageTranslationResult(
                 blocks.map { it.text to it.boundingBox },
                 engineMode
@@ -112,8 +120,17 @@ class TranslationManager(private val appContext: Context? = null) {
                 val pairs = coroutineScope {
                     blocks.map { block ->
                         async {
-                            val translated = translateViaFreeCloud(block.text, sourceLang, targetLang)
-                            translated to block.boundingBox
+                            if (block.detectedLanguage == targetLang) {
+                                block.text to block.boundingBox
+                            } else {
+                                val sl = if (sourceLang == AppLanguages.AUTO) {
+                                    AppLanguages.AUTO
+                                } else {
+                                    block.detectedLanguage ?: sourceLang
+                                }
+                                val translated = translateViaFreeCloud(block.text, sl, targetLang)
+                                translated to block.boundingBox
+                            }
                         }
                     }.awaitAll()
                 }
@@ -131,7 +148,7 @@ class TranslationManager(private val appContext: Context? = null) {
         preferredHymtVariant: String = "Q3_K_S"
     ): String = withContext(Dispatchers.IO) {
         if (text.isBlank()) return@withContext ""
-        if (sourceLang == targetLang) return@withContext text
+        if (sourceLang != AppLanguages.AUTO && sourceLang == targetLang) return@withContext text
 
         when (engineMode) {
             AppPreferences.ENGINE_HY_MT2 -> {
@@ -163,30 +180,41 @@ class TranslationManager(private val appContext: Context? = null) {
         targetLang: String,
         wholePageContextEnabled: Boolean
     ): List<Pair<String, android.graphics.Rect>> {
-        if (blocks.size == 1 || !wholePageContextEnabled) {
-            val allLines = blocks.map { it.text }
+        val allTexts = blocks.map { it.text }
+        val pendingIndices = blocks.indices.filter { blocks[it].detectedLanguage != targetLang }
+        if (pendingIndices.isEmpty()) {
+            return blocks.map { it.text to it.boundingBox }
+        }
+
+        if (pendingIndices.size == 1 || !wholePageContextEnabled) {
             return blocks.map { block ->
-                val prompt = if (wholePageContextEnabled && blocks.size > 1) {
-                    TranslationBatchHelper.buildContextSingleHymtPrompt(block.text, allLines, targetLang)
+                if (block.detectedLanguage == targetLang) {
+                    block.text to block.boundingBox
                 } else {
-                    TranslationBatchHelper.buildSingleHymtPrompt(block.text, targetLang)
+                    val prompt = if (wholePageContextEnabled && blocks.size > 1) {
+                        TranslationBatchHelper.buildContextSingleHymtPrompt(block.text, allTexts, targetLang)
+                    } else {
+                        TranslationBatchHelper.buildSingleHymtPrompt(block.text, targetLang)
+                    }
+                    val raw = LlamaBridge.nativeTranslate(prompt, 384, 0.3f)
+                    val cleaned = TranslationBatchHelper.cleanSingleOutput(raw.orEmpty())
+                    (cleaned.ifBlank { block.text }) to block.boundingBox
                 }
-                val raw = LlamaBridge.nativeTranslate(prompt, 384, 0.3f)
-                val cleaned = TranslationBatchHelper.cleanSingleOutput(raw.orEmpty())
-                (cleaned.ifBlank { block.text }) to block.boundingBox
             }
         }
 
-        // Batch sequentially in chunks of up to 8 bubbles so n_ctx=2048 stays sharp and fast
-        val allTexts = blocks.map { it.text }
-        val resolved = MutableList<String?>(blocks.size) { null }
+        // Batch sequentially in chunks of up to 8 untranslated bubbles so n_ctx=2048 stays sharp and fast
+        val resolved = MutableList<String?>(blocks.size) { idx ->
+            if (blocks[idx].detectedLanguage == targetLang) blocks[idx].text else null
+        }
         val chunkSize = 8
         var offset = 0
-        while (offset < blocks.size) {
-            val chunk = allTexts.subList(offset, minOf(offset + chunkSize, blocks.size))
-            if (chunk.size == 1) {
+        while (offset < pendingIndices.size) {
+            val chunkIndices = pendingIndices.subList(offset, minOf(offset + chunkSize, pendingIndices.size))
+            if (chunkIndices.size == 1) {
+                val idx = chunkIndices[0]
                 val singlePrompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
-                    sourceText = chunk[0],
+                    sourceText = blocks[idx].text,
                     pageContextLines = allTexts,
                     targetLang = targetLang
                 )
@@ -194,22 +222,25 @@ class TranslationManager(private val appContext: Context? = null) {
                     LlamaBridge.nativeTranslate(singlePrompt, 384, 0.3f).orEmpty()
                 )
                 if (out.isNotBlank()) {
-                    resolved[offset] = out
+                    resolved[idx] = out
                 }
             } else {
+                val chunkTexts = chunkIndices.map { blocks[it].text }
+                val chunkLangs = chunkIndices.map { blocks[it].detectedLanguage }
                 val prompt = TranslationBatchHelper.buildTaggedBatchPrompt(
-                    bubbles = chunk,
+                    bubbles = chunkTexts,
                     targetLang = targetLang,
                     sourceLang = sourceLang,
-                    includeContextInstruction = true
+                    includeContextInstruction = true,
+                    bubbleDetectedLangs = chunkLangs
                 )
-                val maxOutTokens = (chunk.sumOf { it.length } * 2 + 128).coerceIn(256, 1024)
+                val maxOutTokens = (chunkTexts.sumOf { it.length } * 2 + 128).coerceIn(256, 1024)
                 val raw = LlamaBridge.nativeTranslate(prompt, maxOutTokens, 0.25f).orEmpty()
-                val parsed = TranslationBatchHelper.parseTaggedBatchResponse(raw, chunk.size)
-                for (i in chunk.indices) {
+                val parsed = TranslationBatchHelper.parseTaggedBatchResponse(raw, chunkTexts.size)
+                for (i in chunkIndices.indices) {
                     val item = parsed[i + 1]
                     if (!item.isNullOrBlank()) {
-                        resolved[offset + i] = item
+                        resolved[chunkIndices[i]] = item
                     }
                 }
             }
@@ -217,7 +248,7 @@ class TranslationManager(private val appContext: Context? = null) {
         }
 
         // Recover any bubble omitted from the batch delimiter output using page background context
-        for (i in blocks.indices) {
+        for (i in pendingIndices) {
             if (resolved[i].isNullOrBlank()) {
                 val prompt = TranslationBatchHelper.buildContextSingleHymtPrompt(
                     sourceText = blocks[i].text,
@@ -242,40 +273,59 @@ class TranslationManager(private val appContext: Context? = null) {
         apiKey: String,
         wholePageContextEnabled: Boolean
     ): List<Pair<String, android.graphics.Rect>> {
-        if (blocks.size == 1 || !wholePageContextEnabled) {
+        val pendingIndices = blocks.indices.filter { blocks[it].detectedLanguage != targetLang }
+        if (pendingIndices.isEmpty()) {
+            return blocks.map { it.text to it.boundingBox }
+        }
+
+        if (pendingIndices.size == 1 || !wholePageContextEnabled) {
             return coroutineScope {
                 blocks.map { block ->
                     async {
-                        val t = translateViaGeminiSingle(block.text, sourceLang, targetLang, apiKey)
-                        t to block.boundingBox
+                        if (block.detectedLanguage == targetLang) {
+                            block.text to block.boundingBox
+                        } else {
+                            val effSrc = block.detectedLanguage ?: sourceLang
+                            val t = translateViaGeminiSingle(block.text, effSrc, targetLang, apiKey)
+                            t to block.boundingBox
+                        }
                     }
                 }.awaitAll()
             }
         }
 
         val prompt = TranslationBatchHelper.buildTaggedBatchPrompt(
-            bubbles = blocks.map { it.text },
+            bubbles = pendingIndices.map { blocks[it].text },
             targetLang = targetLang,
             sourceLang = sourceLang,
-            includeContextInstruction = true
+            includeContextInstruction = true,
+            bubbleDetectedLangs = pendingIndices.map { blocks[it].detectedLanguage }
         )
 
         val batchResponse = callGeminiPrompt(prompt, apiKey)
         val parsed = if (batchResponse != null) {
-            TranslationBatchHelper.parseTaggedBatchResponse(batchResponse, blocks.size)
+            TranslationBatchHelper.parseTaggedBatchResponse(batchResponse, pendingIndices.size)
         } else {
             emptyMap()
         }
 
+        val pendingPositionMap = pendingIndices.withIndex().associate { (pos, origIdx) -> origIdx to (pos + 1) }
+
         return coroutineScope {
             blocks.mapIndexed { index, block ->
                 async {
-                    val existing = parsed[index + 1]
-                    if (!existing.isNullOrBlank()) {
-                        existing to block.boundingBox
+                    if (block.detectedLanguage == targetLang) {
+                        block.text to block.boundingBox
                     } else {
-                        val single = translateViaGeminiSingle(block.text, sourceLang, targetLang, apiKey)
-                        single to block.boundingBox
+                        val batchPos = pendingPositionMap[index]
+                        val existing = if (batchPos != null) parsed[batchPos] else null
+                        if (!existing.isNullOrBlank()) {
+                            existing to block.boundingBox
+                        } else {
+                            val effSrc = block.detectedLanguage ?: sourceLang
+                            val single = translateViaGeminiSingle(block.text, effSrc, targetLang, apiKey)
+                            single to block.boundingBox
+                        }
                     }
                 }
             }.awaitAll()
@@ -289,8 +339,17 @@ class TranslationManager(private val appContext: Context? = null) {
     ): List<Pair<String, android.graphics.Rect>> = coroutineScope {
         blocks.map { block ->
             async {
-                val t = translateSingleMlKitOrCloud(block.text, sourceLang, targetLang)
-                t to block.boundingBox
+                val effectiveSource = when {
+                    !block.detectedLanguage.isNullOrBlank() -> block.detectedLanguage
+                    sourceLang != AppLanguages.AUTO -> sourceLang
+                    else -> AppLanguages.AUTO
+                }
+                if (effectiveSource == targetLang) {
+                    block.text to block.boundingBox
+                } else {
+                    val t = translateSingleMlKitOrCloud(block.text, effectiveSource, targetLang)
+                    t to block.boundingBox
+                }
             }
         }.awaitAll()
     }
@@ -300,17 +359,30 @@ class TranslationManager(private val appContext: Context? = null) {
         sourceLang: String,
         targetLang: String
     ): String {
+        if (sourceLang == targetLang) return text
+        val mlSource = mapToMlKitLanguage(sourceLang)
+        val mlTarget = mapToMlKitLanguage(targetLang)
+        if (mlSource == null || mlTarget == null) {
+            return translateViaFreeCloud(
+                text = text,
+                sourceLang = sourceLang.ifBlank { AppLanguages.AUTO },
+                targetLang = targetLang
+            )
+        }
+
         return try {
-            translateOnDevice(text, sourceLang, targetLang)
+            translateOnDevice(text, mlSource, mlTarget)
         } catch (e: Exception) {
-            Log.w(TAG, "ML Kit failed, falling back to Cloud Free: ${e.message}")
+            Log.w(TAG, "ML Kit ($mlSource->$mlTarget) failed, falling back to Cloud Free: ${e.message}")
             translateViaFreeCloud(text, sourceLang, targetLang)
         }
     }
 
-    private suspend fun translateOnDevice(text: String, sourceLang: String, targetLang: String): String {
-        val mlSource = mapToMlKitLanguage(sourceLang)
-        val mlTarget = mapToMlKitLanguage(targetLang)
+    private suspend fun translateOnDevice(
+        text: String,
+        mlSource: String,
+        mlTarget: String
+    ): String {
         val key = "$mlSource-$mlTarget"
 
         val translator = synchronized(mlKitTranslators) {
@@ -350,10 +422,11 @@ class TranslationManager(private val appContext: Context? = null) {
         if (apiKey.isBlank()) {
             return "Lỗi: Chưa nhập Gemini API Key."
         }
-        val prompt = TranslationBatchHelper.buildSingleHymtPrompt(
+        val prompt = TranslationBatchHelper.buildGeminiSinglePrompt(
             sourceText = text,
+            sourceLang = sourceLang,
             targetLang = targetLang
-        ) + "\nSource language: ${TranslationBatchHelper.languageEnglishName(sourceLang)}."
+        )
         return callGeminiPrompt(prompt, apiKey) ?: "[Lỗi Gemini] Không thể dịch."
     }
 
@@ -409,7 +482,8 @@ class TranslationManager(private val appContext: Context? = null) {
     private fun translateViaFreeCloud(text: String, sourceLang: String, targetLang: String): String {
         return try {
             val encodedText = URLEncoder.encode(text, "UTF-8")
-            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sourceLang&tl=$targetLang&dt=t&q=$encodedText"
+            val sl = sourceLang.ifBlank { AppLanguages.AUTO }
+            val url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=$sl&tl=$targetLang&dt=t&q=$encodedText"
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Mozilla/5.0")
@@ -433,13 +507,27 @@ class TranslationManager(private val appContext: Context? = null) {
         }
     }
 
-    private fun mapToMlKitLanguage(code: String): String {
-        return when (code) {
+    private fun mapToMlKitLanguage(code: String): String? {
+        if (code.isBlank() || code == AppLanguages.AUTO) return null
+        return when (code.lowercase()) {
             "vi" -> TranslateLanguage.VIETNAMESE
+            "en" -> TranslateLanguage.ENGLISH
             "ja" -> TranslateLanguage.JAPANESE
             "ko" -> TranslateLanguage.KOREAN
             "zh" -> TranslateLanguage.CHINESE
-            else -> TranslateLanguage.ENGLISH
+            "fr" -> TranslateLanguage.FRENCH
+            "de" -> TranslateLanguage.GERMAN
+            "es" -> TranslateLanguage.SPANISH
+            "pt" -> TranslateLanguage.PORTUGUESE
+            "id" -> TranslateLanguage.INDONESIAN
+            "it" -> TranslateLanguage.ITALIAN
+            "nl" -> TranslateLanguage.DUTCH
+            "pl" -> TranslateLanguage.POLISH
+            "tr" -> TranslateLanguage.TURKISH
+            "ru" -> TranslateLanguage.RUSSIAN
+            "th" -> TranslateLanguage.THAI
+            "ar" -> TranslateLanguage.ARABIC
+            else -> TranslateLanguage.fromLanguageTag(code)
         }
     }
 

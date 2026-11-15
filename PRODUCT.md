@@ -27,7 +27,7 @@ Unlike commercial screen translators that enforce daily quotas, show ads, or sen
 
 ## Capabilities and Constraints
 
-- Supported languages: English (`en`), Japanese (`ja`), Chinese (`zh`), Korean (`ko`), Vietnamese (`vi`).
+- Supported languages: Automatic multi-language per-bubble detection (`auto` — simultaneous Latin + Japanese + Chinese + Korean OCR & script/ML Kit identification on the same page), plus 15 OCR source languages (`en`, `ja`, `zh`, `ko`, `fr`, `de`, `es`, `pt`, `id`, `it`, `nl`, `pl`, `tr`, `vi`) and 17 target languages (adding `ru`, `th`, `ar`).
 - Engines:
   1. `hy_mt2`: On-device `tencent/Hy-MT2-1.8B` / `unsloth/Hy-MT2-1.8B-GGUF` running via `llama.cpp` JNI (ARM64/NEON). Requires downloading one GGUF quant file in-app (`UD-IQ2_M` ~689 MB, `Q3_K_S` ~832 MB, or `Q4_K_M` ~1.08 GB) before offline inference.
   2. `on_device`: Google ML Kit On-Device Translation (`com.google.mlkit:translate:17.0.2`), auto-downloading language packs on first use and falling back to Cloud Free on failure.

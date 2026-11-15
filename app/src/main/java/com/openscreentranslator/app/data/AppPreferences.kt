@@ -8,11 +8,11 @@ class AppPreferences(context: Context) {
         context.getSharedPreferences("open_screen_translator_prefs", Context.MODE_PRIVATE)
 
     var sourceLanguage: String
-        get() = prefs.getString("source_language", "en") ?: "en"
+        get() = prefs.getString("source_language", AppLanguages.AUTO) ?: AppLanguages.AUTO
         set(value) = prefs.edit().putString("source_language", value).apply()
 
     var targetLanguage: String
-        get() = prefs.getString("target_language", "vi") ?: "vi"
+        get() = prefs.getString("target_language", AppLanguages.DEFAULT_TARGET) ?: AppLanguages.DEFAULT_TARGET
         set(value) = prefs.edit().putString("target_language", value).apply()
 
     /**
